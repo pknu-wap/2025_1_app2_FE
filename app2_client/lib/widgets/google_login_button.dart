@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app2_client/services/auth_service.dart';
 
 class GoogleLoginButton extends StatelessWidget {
   const GoogleLoginButton({super.key});
@@ -9,8 +10,12 @@ class GoogleLoginButton extends StatelessWidget {
       height: 50,
       width: double.infinity,
       child: OutlinedButton(
-        onPressed: () {
-          // TODO: 구글 로그인 연결
+        onPressed: () async {
+          final success = await AuthService().authenticateWithBackend();
+          final message = success ? "로그인 성공!" : "로그인 실패";
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(message)),
+          );
         },
         style: OutlinedButton.styleFrom(
           shape: RoundedRectangleBorder(
@@ -22,17 +27,12 @@ class GoogleLoginButton extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // 구글 로고 이미지 호출; 에셋 등록과 경로 확인 필수!
             Image.asset(
               'assets/google_logo.png',
               height: 20,
-              errorBuilder: (context, error, stackTrace) {
-                // 에셋 로드에 실패하면 빈 컨테이너로 대체하거나, placeholder 이미지 표시
-                return const SizedBox();
-              },
+              errorBuilder: (context, error, stackTrace) => const SizedBox(),
             ),
             const SizedBox(width: 12),
-            // Expanded로 텍스트를 감싸서 남은 공간에 맞게 줄어들도록 함
             const Expanded(
               child: Text(
                 'Sign in with Google',
