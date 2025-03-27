@@ -2,6 +2,20 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+
+    <!-- 구글 로그인용 URL Types 추가 (이 부분을 새로 추가) -->
+
+    <key>CFBundleURLTypes</key>
+    <array>
+      <dict>
+        <key>CFBundleURLSchemes</key>
+        <array>
+          <!-- 실제 iOS URL 스키마 값 -->
+          <string>com.googleusercontent.apps.103432441156-v010qrvgibrim15me9icquslhuc3pbf4</string>
+        </array>
+      </dict>
+    </array>
+
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
