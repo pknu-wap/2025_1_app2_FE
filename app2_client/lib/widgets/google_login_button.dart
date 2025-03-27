@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app2_client/models/user_model.dart';
 import 'package:app2_client/services/auth_service.dart';
 
 class GoogleLoginButton extends StatelessWidget {
@@ -11,11 +12,13 @@ class GoogleLoginButton extends StatelessWidget {
       width: double.infinity,
       child: OutlinedButton(
         onPressed: () async {
-          final success = await AuthService().authenticateWithBackend();
-          final message = success ? "로그인 성공!" : "로그인 실패";
+          // 이제 boolean 대신 UserModel? 반환
+          final UserModel? user = await AuthService().loginWithGoogle();
+          final message = user != null ? "로그인 성공!" : "로그인 실패";
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(message)),
           );
+          // 추가: 로그인 성공 후, user.isRegistered 값에 따라 추가 회원가입 화면 전환 가능
         },
         style: OutlinedButton.styleFrom(
           shape: RoundedRectangleBorder(
