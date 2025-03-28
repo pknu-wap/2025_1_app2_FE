@@ -14,6 +14,7 @@ class _SignupScreenState extends State<SignupScreen> {
   String _name = '';
   String _phone = '';
   String _age = '';
+  String? _gender;
 
   void _submit() async {
     if (_formKey.currentState!.validate()) {
@@ -21,7 +22,8 @@ class _SignupScreenState extends State<SignupScreen> {
       final additionalInfo = {
         'name': _name,
         'phone': _phone,
-        'age': int.tryParse(_age) ?? 0,
+        'age': _age,
+        'gender': _gender,
       };
 
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -44,6 +46,8 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final genderOptions = ['남', '여'];
+
     return Scaffold(
       appBar: AppBar(title: const Text("회원가입")),
       body: Padding(

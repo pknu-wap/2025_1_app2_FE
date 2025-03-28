@@ -21,6 +21,9 @@ class AuthService {
         name: googleUser.displayName ?? '',
         isRegistered: false,
         token: googleAuth.idToken ?? '',
+        phone: '',
+        age: 20,
+        gender: '남'
       );
     } catch (e) {
       print('구글 로그인 실패: $e');
