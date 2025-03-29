@@ -1,30 +1,22 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:app2_client/main.dart';
+import 'package:app2_client/widgets/custom_back_button.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('CustomBackButton displays correctly', (WidgetTester tester) async {
+    // 테스트를 위해 MaterialApp과 Scaffold로 감싸서 위젯을 렌더링합니다.
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: CustomBackButton(),
+        ),
+      ),
+    );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // CustomBackButton 위젯이 화면에 존재하는지 확인합니다.
+    expect(find.byType(CustomBackButton), findsOneWidget);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // 추가: 아이콘이 있는지 검사할 수 있습니다.
+    expect(find.byIcon(Icons.arrow_back), findsOneWidget);
   });
 }
