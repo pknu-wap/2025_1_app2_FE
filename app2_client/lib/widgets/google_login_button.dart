@@ -3,7 +3,9 @@ import 'package:app2_client/models/user_model.dart';
 import 'package:app2_client/services/auth_service.dart';
 
 class GoogleLoginButton extends StatelessWidget {
-  const GoogleLoginButton({super.key});
+  final VoidCallback onLoginSuccess; // 콜백 추가
+
+  const GoogleLoginButton({super.key, required this.onLoginSuccess}); // 생성자에 추가
 
   @override
   Widget build(BuildContext context) {
@@ -12,13 +14,18 @@ class GoogleLoginButton extends StatelessWidget {
       width: double.infinity,
       child: OutlinedButton(
         onPressed: () async {
-          // 이제 boolean 대신 UserModel? 반환
+          // UserModel을 받아오기
           final UserModel? user = await AuthService().loginWithGoogle();
+
           final message = user != null ? "로그인 성공!" : "로그인 실패";
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(message)),
           );
-          // 추가: 로그인 성공 후, user.isRegistered 값에 따라 추가 회원가입 화면 전환 가능
+
+          // 로그인 성공 시 콜백 실행
+          if (user != null) {
+            onLoginSuccess(); // LoginScreen에서 정의한 화면 전환 함수 실행
+          }
         },
         style: OutlinedButton.styleFrom(
           shape: RoundedRectangleBorder(
