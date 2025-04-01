@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:app2_client/widgets/google_login_button.dart';
-import 'package:app2_client/screens/signup_screen.dart'; // SignupScreen 임포트
+import 'package:app2_client/screens/signup_screen.dart';
+import 'package:app2_client/screens/destinationselect_screen.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -24,12 +25,23 @@ class LoginScreen extends StatelessWidget {
               const SizedBox(height: 100),
               const Text('이메일로 로그인', style: TextStyle(fontSize: 14)),
               const SizedBox(height: 10),
-              const GoogleLoginButton(),
+
+              // 수정된 GoogleLoginButton: 콜백 전달
+              GoogleLoginButton(
+                onLoginSuccess: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const DestinationSelectScreen(),
+                    ),
+                  );
+                },
+              ),
+
               const SizedBox(height: 40),
               Center(
                 child: TextButton(
                   onPressed: () {
-                    // 회원가입 화면으로 이동
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => const SignupScreen()),
