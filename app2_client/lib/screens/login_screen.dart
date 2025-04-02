@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:app2_client/widgets/google_login_button.dart';
 import 'package:app2_client/screens/signup_screen.dart';
-import 'package:app2_client/screens/destinationselect_screen.dart';
+import 'package:app2_client/screens/destination_select_screen.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
