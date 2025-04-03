@@ -37,6 +37,7 @@ dependencies:
   google_sign_in: ^6.3.0
   provider: ^6.0.0
   webview_flutter: ^3.0.4
+  flutter_rating_bar: ^4.0.1
 
 dev_dependencies:
   flutter_test:
@@ -80,6 +81,10 @@ flutter:
   # "family" key with the font family name, and a "fonts" key with a
   # list giving the asset and other descriptors for the font. For
   # example:
+  fonts:
+    - family: jua
+      fonts:
+        - asset: asset/font/Jua/Jua-Regular.ttf
   # fonts:
   #   - family: Schyler
   #     fonts:
