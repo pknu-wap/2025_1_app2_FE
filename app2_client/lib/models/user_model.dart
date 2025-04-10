@@ -6,6 +6,7 @@ class UserModel {
   final String phone;
   final int age;
   final String gender; // 추가: 성별
+  final String role; // 추가: 역할 구분 (예: 'a', 'b')
 
   UserModel({
     required this.email,
@@ -15,6 +16,7 @@ class UserModel {
     required this.phone,
     required this.age,
     required this.gender,
+    required this.role,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -26,6 +28,7 @@ class UserModel {
       phone: json['phone'] as String,
       age: json['age'] as int,
       gender: json['gender'] as String,
+      role: json['role'] as String,
     );
   }
 }

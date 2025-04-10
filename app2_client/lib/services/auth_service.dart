@@ -23,13 +23,15 @@ class AuthService {
         token: googleAuth.idToken ?? '',
         phone: '',
         age: 20,
-        gender: '남'
+        gender: '남',
+        role: 'a', // ✅ 추가됨
       );
     } catch (e) {
       print('구글 로그인 실패: $e');
       return null;
     }
   }
+
 
   /// 추가 정보(회원가입) 전송 - 백엔드에 POST 요청
   Future<UserModel?> completeSignup(Map<String, dynamic> additionalInfo, String token) async {
