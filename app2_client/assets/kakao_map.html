@@ -1,54 +1,73 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
-    <title>Kakao Map Example</title>
-    <!-- Kakao 지도 API 호출: YOUR_KAKAO_APP_KEY 부분을 실제 발급받은 키로 변경 -->
-    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=YOUR_KAKAO_APP_KEY"></script>
+    <meta charset="utf-8" />
+    <title>Kakao Map</title>
     <style>
-        html, body {
-          width: 100%;
-          height: 100%;
-          margin: 0;
-          padding: 0;
-        }
-        #map {
-          width: 100%;
-          height: 100%;
+        html, body, #map {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
         }
     </style>
+    <!-- (1) Kakao Maps SDK 로드 (YOUR_KAKAO_JS_KEY 플레이스홀더는 Flutter에서 치환) -->
+    <script
+            type="text/javascript"
+            src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=__KAKAO_JS_KEY__">
+    </script>
 </head>
 <body>
 <div id="map"></div>
 <script>
-    // Flutter에서 전달받은 초기 좌표 값(플레이스홀더)
-    // 만약 값이 없으면 기본값으로 서울 시청 좌표(37.5665, 126.9780)를 사용
-    var initialLat = parseFloat("__INITIAL_LAT__") || 37.5665;
-    var initialLng = parseFloat("__INITIAL_LNG__") || 126.9780;
+    // Flutter 에서 replaceAll 로 초기 좌표를 채워넣어 줍니다.
+    var initialLat = __INITIAL_LAT__ || 37.5665;
+    var initialLng = __INITIAL_LNG__ || 126.9780;
 
-    var container = document.getElementById('map');
-    var options = {
-      center: new kakao.maps.LatLng(initialLat, initialLng),
-      level: 3
+    // (2) 지도 생성
+    var mapContainer = document.getElementById('map');
+    var mapOption = {
+        center: new kakao.maps.LatLng(initialLat, initialLng),
+        level: 4
     };
+    var map = new kakao.maps.Map(mapContainer, mapOption);
 
-    // 지도 생성
-    var map = new kakao.maps.Map(container, options);
-
-    // 드래그 가능한 마커 생성 및 지도에 표시
-    var marker = new kakao.maps.Marker({
-      position: map.getCenter(),
-      draggable: true
+    // 지도 중심 변경 시 현재 중심 좌표 저장
+    kakao.maps.event.addListener(map, 'center_changed', function() {
+        window.currentCenter = map.getCenter();
     });
-    marker.setMap(map);
 
-    // 드래그가 끝났을 때 호출되어, 선택된 마커의 위치를 JSON 문자열로 반환하는 함수
+    // (3) Flutter 호출용 JS 함수들
+
+    // a) 선택된 목적지(지도 중심) 좌표를 JSON 문자열로 반환
     function getSelectedDestination() {
-      var pos = marker.getPosition();
-      return JSON.stringify({
-        lat: pos.getLat(),
-        lng: pos.getLng()
-      });
+        var c = window.currentCenter || map.getCenter();
+        return JSON.stringify({
+            lat: c.getLat(),
+            lng: c.getLng()
+        });
+    }
+
+    // b) 파티 시작 지점을 찍는 마커 추가
+    function addPartyMarker(lat, lng) {
+        new kakao.maps.Marker({
+            position: new kakao.maps.LatLng(lat, lng),
+            map: map
+        });
+    }
+
+    // c) 지정 반경만큼 지도 위에 반투명 원(circle) 그리기
+    function drawCircle(lat, lng, radius) {
+        new kakao.maps.Circle({
+            center: new kakao.maps.LatLng(lat, lng),
+            radius: radius,
+            strokeWeight: 2,
+            strokeColor: '#FF0000',
+            strokeOpacity: 0.7,
+            fillColor: '#FF0000',
+            fillOpacity: 0.1,
+            map: map
+        });
     }
 </script>
 </body>
