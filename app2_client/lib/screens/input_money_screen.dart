@@ -15,10 +15,10 @@ class RideSplitPage extends StatefulWidget {
 
 class _RideSplitPageState extends State<RideSplitPage> {
   final List<User> passengers = [
-    User(id: '1', name: '성은', isSelf: true),
-    User(id: '2', name: '민서'),
-    User(id: '3', name: '준용'),
-    User(id: '4', name: '채은'),
+    User(id: '1', name: '나', isSelf: true),
+    User(id: '2', name: '지민'),
+    User(id: '3', name: '수아'),
+    User(id: '4', name: '태윤'),
   ];
 
   late User currentUser;
