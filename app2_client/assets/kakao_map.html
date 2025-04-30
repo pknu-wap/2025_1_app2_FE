@@ -1,74 +1,38 @@
+<!-- assets/kakao_map.html -->
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
-    <meta charset="utf-8" />
-    <title>Kakao Map</title>
-    <style>
-        html, body, #map {
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            padding: 0;
-        }
-    </style>
-    <!-- (1) Kakao Maps SDK 로드 (YOUR_KAKAO_JS_KEY 플레이스홀더는 Flutter에서 치환) -->
-    <script
-            type="text/javascript"
-            src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=__KAKAO_JS_KEY__">
-    </script>
+    <meta charset="UTF-8" />
+    <title>지도 띄우기</title>
 </head>
 <body>
-<div id="map"></div>
+<div id="map" style="width:100%; height:100vh;"></div>
+
+<!-- env 치환을 위해 {{KAKAO_JS_KEY}} 플레이스홀더 사용 -->
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={{KAKAO_JS_KEY}}&libraries=services"></script>
 <script>
-    // Flutter 에서 replaceAll 로 초기 좌표를 채워넣어 줍니다.
-    var initialLat = __INITIAL_LAT__ || 37.5665;
-    var initialLng = __INITIAL_LNG__ || 126.9780;
+    let selectedLatLng = { lat: {{LAT}}, lng: {{LNG}} };
 
-    // (2) 지도 생성
-    var mapContainer = document.getElementById('map');
-    var mapOption = {
-        center: new kakao.maps.LatLng(initialLat, initialLng),
+    window.onload = function () {
+      const container = document.getElementById('map');
+      const options = {
+        center: new kakao.maps.LatLng({{LAT}}, {{LNG}}),
         level: 4
+      };
+      const map = new kakao.maps.Map(container, options);
+
+      kakao.maps.event.addListener(map, 'click', function (mouseEvent) {
+        const latlng = mouseEvent.latLng;
+        selectedLatLng = {
+          lat: latlng.getLat(),
+          lng: latlng.getLng()
+        };
+      });
     };
-    var map = new kakao.maps.Map(mapContainer, mapOption);
 
-    // 지도 중심 변경 시 현재 중심 좌표 저장
-    kakao.maps.event.addListener(map, 'center_changed', function() {
-        window.currentCenter = map.getCenter();
-    });
-
-    // (3) Flutter 호출용 JS 함수들
-
-    // a) 선택된 목적지(지도 중심) 좌표를 JSON 문자열로 반환
-    function getSelectedDestination() {
-        var c = window.currentCenter || map.getCenter();
-        return JSON.stringify({
-            lat: c.getLat(),
-            lng: c.getLng()
-        });
-    }
-
-    // b) 파티 시작 지점을 찍는 마커 추가
-    function addPartyMarker(lat, lng) {
-        new kakao.maps.Marker({
-            position: new kakao.maps.LatLng(lat, lng),
-            map: map
-        });
-    }
-
-    // c) 지정 반경만큼 지도 위에 반투명 원(circle) 그리기
-    function drawCircle(lat, lng, radius) {
-        new kakao.maps.Circle({
-            center: new kakao.maps.LatLng(lat, lng),
-            radius: radius,
-            strokeWeight: 2,
-            strokeColor: '#FF0000',
-            strokeOpacity: 0.7,
-            fillColor: '#FF0000',
-            fillOpacity: 0.1,
-            map: map
-        });
-    }
+    window.getSelectedDestination = function () {
+      return JSON.stringify(selectedLatLng);
+    };
 </script>
 </body>
 </html>
