@@ -1,4 +1,3 @@
-// lib/screens/search_address_screen.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -37,17 +36,14 @@ class _SearchAddressScreenState extends State<SearchAddressScreen> {
       final docs = body['documents'] as List<dynamic>;
       setState(() {
         _results = docs
-            .map((e) => AddressModel.fromJson(e as Map<String, dynamic>))
+            .map((e) => AddressModel.fromJson(e))
             .toList();
       });
     } else {
-      // 에러 처리
       debugPrint('주소 검색 실패: ${resp.statusCode} ${resp.body}');
     }
 
-    setState(() {
-      _isLoading = false;
-    });
+    setState(() => _isLoading = false);
   }
 
   @override
@@ -85,7 +81,6 @@ class _SearchAddressScreenState extends State<SearchAddressScreen> {
                   title: Text(addr.addressName),
                   subtitle: Text('(${addr.lat}, ${addr.lng})'),
                   onTap: () {
-                    // 선택된 좌표를 넘겨주며 Map 화면으로 이동
                     Navigator.push(
                       context,
                       MaterialPageRoute(

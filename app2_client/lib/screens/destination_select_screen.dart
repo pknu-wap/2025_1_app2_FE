@@ -2,17 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:app2_client/screens/destination_map_screen.dart';
 
 class DestinationSelectScreen extends StatelessWidget {
-  const DestinationSelectScreen({super.key});
+  const DestinationSelectScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    // 임시 dummy 검색 결과 목록
-    final List<String> searchResults = [
-      '서울특별시 강남구 테헤란로 123',
-      '서울특별시 종로구 종로 1',
-      '부산광역시 해운대구 센텀중앙로 200',
-    ];
-
     return Scaffold(
       appBar: AppBar(
         leading: const BackButton(),
@@ -45,14 +38,14 @@ class DestinationSelectScreen extends StatelessWidget {
                 ),
                 contentPadding: const EdgeInsets.symmetric(vertical: 15),
               ),
-              // 사용자가 검색어를 입력 후 엔터를 누르면 MapScreen으로 이동하며 dummy 좌표 전달
               onSubmitted: (value) {
+                if (value.isEmpty) return;
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const DestinationMapScreen(
-                      initialLat: 37.567,
-                      initialLng: 126.978,
+                    builder: (_) => const DestinationMapScreen(
+                      initialLat: 37.5665,
+                      initialLng: 126.9780,
                     ),
                   ),
                 );
@@ -61,13 +54,12 @@ class DestinationSelectScreen extends StatelessWidget {
             const SizedBox(height: 10),
             OutlinedButton.icon(
               onPressed: () {
-                // "현재 위치로 찾기" 버튼 누르면 MapScreen으로 이동 (dummy 좌표 전달)
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const DestinationMapScreen(
-                      initialLat: 37.567,
-                      initialLng: 126.978,
+                    builder: (_) => const DestinationMapScreen(
+                      initialLat: 37.5665,
+                      initialLng: 126.9780,
                     ),
                   ),
                 );
@@ -84,28 +76,9 @@ class DestinationSelectScreen extends StatelessWidget {
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
-            Expanded(
-              child: ListView.builder(
-                itemCount: searchResults.length,
-                itemBuilder: (context, index) {
-                  return ListTile(
-                    title: Text(searchResults[index]),
-                    onTap: () {
-                      // 사용자가 리스트의 주소를 선택하면 MapScreen으로 이동하며 dummy 좌표 전달
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const DestinationMapScreen(
-                            initialLat: 37.567,
-                            initialLng: 126.978,
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
+            const Text('• 도로명 + 건물번호 (위례성대로 2)'),
+            const Text('• 건물명 + 번지 (방이동 44-2)'),
+            const Text('• 건물명, 아파트명 (반포 자이, 분당 주공 1차)'),
           ],
         ),
       ),
