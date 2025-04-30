@@ -1,31 +1,81 @@
+// lib/screens/party_map_screen.dart
+
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:app2_client/widgets/custom_back_button.dart';
-import 'party_create_screen.dart'; // 팟 생성 페이지 (임시 페이지)
+import 'package:app2_client/screens/party_create_screen.dart';
 
 class PartyMapScreen extends StatefulWidget {
-  const PartyMapScreen({Key? key}) : super(key: key);
+  final double initialLat;
+  final double initialLng;
+
+  const PartyMapScreen({
+    Key? key,
+    required this.initialLat,
+    required this.initialLng,
+  }) : super(key: key);
 
   @override
-  _PartyMapScreenState createState() => _PartyMapScreenState();
+  State<PartyMapScreen> createState() => _PartyMapScreenState();
 }
 
 class _PartyMapScreenState extends State<PartyMapScreen> {
-  late WebViewController _controller;
-  String _localHtml = '';
+  late final WebViewController _controller;
+  bool _pageLoaded = false;
 
   @override
   void initState() {
     super.initState();
-    _loadLocalHtml();
+    _initControllerAndLoadHtml();
   }
 
-  Future<void> _loadLocalHtml() async {
-    _localHtml = await rootBundle.loadString('assets/kakao_map.html');
-    // _controller가 이미 생성되어 있다면 HTML 내용을 로드
-    if (_localHtml.isNotEmpty && _controller != null) {
-      _controller.loadHtmlString(_localHtml);
+  Future<void> _initControllerAndLoadHtml() async {
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(onPageFinished: (_) {
+          setState(() => _pageLoaded = true);
+        }),
+      );
+
+    // 1) HTML 자산 읽기
+    String html = await rootBundle.loadString('assets/kakao_map.html');
+
+    // 2) 플레이스홀더 치환: env 키와 초기 위경도
+    html = html
+        .replaceAll('{{KAKAO_JS_KEY}}', dotenv.env['KAKAO_JS_KEY'] ?? '')
+        .replaceAll('{{LAT}}', widget.initialLat.toString())
+        .replaceAll('{{LNG}}', widget.initialLng.toString());
+
+    // 3) HTML 로드 (baseUrl은 about:blank가 안정적입니다)
+    await _controller.loadHtmlString(html, baseUrl: 'about:blank');
+  }
+
+  Future<void> _onConfirmPressed() async {
+    try {
+      final raw = await _controller.runJavaScriptReturningResult(
+        'getSelectedDestination()',
+      );
+      final coord = jsonDecode(raw.toString()) as Map<String, dynamic>;
+      final lat = coord['lat'] as double;
+      final lng = coord['lng'] as double;
+      debugPrint('선택된 위치: lat=$lat, lng=$lng');
+
+      // destLat/destLng를 PartyCreateScreen에 넘겨줍니다
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PartyCreateScreen(
+            destLat: lat,
+            destLng: lng,
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('지도 조작 에러: $e');
     }
   }
 
@@ -34,59 +84,33 @@ class _PartyMapScreenState extends State<PartyMapScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // WebView: 로컬 kakao_map.html 파일을 로드합니다.
-          WebView(
-            javascriptMode: JavascriptMode.unrestricted,
-            onWebViewCreated: (controller) {
-              _controller = controller;
-              if (_localHtml.isNotEmpty) {
-                _controller.loadHtmlString(_localHtml);
-              }
-            },
-            // 필요하면 JavaScript 채널 설정하여 Flutter와 HTML 간 데이터 주고받기
-          ),
-          // 중앙에 고정된 위치 마커 아이콘 (사용자가 보는 지도 중심 또는 선택된 위치를 표시)
+          // ① WebView
+          WebViewWidget(controller: _controller),
+
+          // ② 중앙 핀
           const Center(
-            child: Icon(
-              Icons.location_on,
-              size: 50,
-              color: Colors.redAccent,
-            ),
+            child: Icon(Icons.location_on, size: 56, color: Colors.redAccent),
           ),
-          // 왼쪽 상단에 재사용 가능한 CustomBackButton 배치
-          const Positioned(
-            top: 40,
-            left: 16,
-            child: CustomBackButton(),
-          ),
-          // 하단 중앙에 "팟 생성하기" 버튼 배치
+
+          // ③ 뒤로가기
+          const Positioned(top: 40, left: 16, child: CustomBackButton()),
+
+          // ④ 팟 생성 버튼
           Positioned(
             bottom: 30,
             left: 16,
             right: 16,
             child: ElevatedButton(
+              onPressed: _pageLoaded ? _onConfirmPressed : null,
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              onPressed: () async {
-                // HTML 내 JavaScript 함수 getSelectedDestination()을 호출하여, 사용자가 선택한 위치 정보를 받아옵니다.
-                String result = await _controller.evaluateJavascript("getSelectedDestination()");
-                print('선택된 위치 정보: $result');
-                // 여기서 result를 파싱하여 백엔드 API 호출 등의 후속 처리를 할 수 있습니다.
-                // 이후, 팟 생성 페이지로 이동합니다.
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const PartyCreateScreen(),
-                  ),
-                );
-              },
-              child: const Text(
-                '팟 생성하기',
-                style: TextStyle(fontSize: 18),
+              child: Text(
+                _pageLoaded ? '팟 생성하기' : '지도 로딩 중...',
+                style: const TextStyle(fontSize: 18),
               ),
             ),
           ),
