@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:app2_client/screens/destination_map_screen.dart';
 
 class DestinationSelectScreen extends StatelessWidget {
-  const DestinationSelectScreen({super.key});
+  const DestinationSelectScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -37,11 +38,31 @@ class DestinationSelectScreen extends StatelessWidget {
                 ),
                 contentPadding: const EdgeInsets.symmetric(vertical: 15),
               ),
+              onSubmitted: (value) {
+                if (value.isEmpty) return;
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const DestinationMapScreen(
+                      initialLat: 37.5665,
+                      initialLng: 126.9780,
+                    ),
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 10),
             OutlinedButton.icon(
               onPressed: () {
-                // 현재 위치 기능 구현 필요
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const DestinationMapScreen(
+                      initialLat: 37.5665,
+                      initialLng: 126.9780,
+                    ),
+                  ),
+                );
               },
               icon: const Icon(Icons.my_location),
               label: const Text('현재 위치로 찾기'),

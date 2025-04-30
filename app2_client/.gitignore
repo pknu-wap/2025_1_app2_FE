@@ -12,6 +12,9 @@
 .swiftpm/
 migrate_working_dir/
 
+# 환경 변수 (API 키 등 민감 정보)
+.env
+
 # IntelliJ related
 *.iml
 *.ipr
