@@ -49,3 +49,5 @@ app.*.map.json
 
 #ios 구글로그인
 ios/Runner/GoogleService-Info.plist
+
+devtools_options.yaml
