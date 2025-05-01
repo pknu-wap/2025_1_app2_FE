@@ -4,18 +4,14 @@ class ApiConstants {
   static String get baseUrl =>
       dotenv.env['BACKEND_BASE_URL'] ?? 'https://fallback-url.com';
 
-  static final kakaoRestKey =
-      dotenv.env['KAKAO_REST_KEY'] ?? '';
-
-  static final kakaoJsKey =
-      dotenv.env['KAKAO_JS_KEY'] ?? '';
+  static final kakaoRestKey = dotenv.env['KAKAO_REST_KEY'] ?? '';
+  static final kakaoJsKey = dotenv.env['KAKAO_JS_KEY'] ?? '';
 
   static const String kakaoSearchUrl =
       'https://dapi.kakao.com/v2/local/search/address.json';
 
-  // 기존 엔드포인트들은 그대로
-  static const String loginEndpoint   = "/api/oauth/login";
-  static const String signupEndpoint  = "/api/oauth/user";
-  static const String partyEndpoint   = "/api/party";
-  static const String partySearch     = "/api/party";
+  static const String loginEndpoint = '/api/oauth/login';
+  static const String signupEndpoint = '/api/oauth/register';
+  static const String partyEndpoint = '/api/party';
+  static const String partySearch = '/api/party';
 }
