@@ -106,12 +106,14 @@ class _DestinationMapScreenState extends State<DestinationMapScreen> {
               onPressed: _pageLoaded ? _onConfirmPressed : null,
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
+                backgroundColor: const Color(0xFF003366),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
               child: Text(
                 _pageLoaded ? '이 위치로 목적지 설정' : '지도 로딩 중...',
+                style: const TextStyle(color: Colors.white, fontSize: 18),
               ),
             ),
           ),
