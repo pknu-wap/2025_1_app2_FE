@@ -80,11 +80,12 @@ class _SignupScreenState extends State<SignupScreen> {
                   readOnly: true,
                   decoration: InputDecoration(
                     hintText: '이름',
-                    filled: true,
-                    fillColor: Colors.grey[100],
+                    filled: false,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
+                      borderSide: BorderSide(
+                          color: Colors.grey.shade600,
+                      ),
                     ),
                   ),
                 ),
@@ -152,11 +153,12 @@ class _SignupScreenState extends State<SignupScreen> {
                     PhoneNumberFormatter()],
                   decoration: InputDecoration(
                     hintText: '전화번호 입력',
-                    filled: true,
-                    fillColor: Colors.grey.shade100,
+                    filled: false,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade600,
+                      ),
                     ),
                   ),
                   onSaved: (v) => _phone = v!,
