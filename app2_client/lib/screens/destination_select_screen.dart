@@ -108,10 +108,9 @@ class _DestinationSelectScreenState extends State<DestinationSelectScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: const BackButton(),
         title: const Text(
-          '출발지 & 목적지 설정',
-          style: TextStyle(fontWeight: FontWeight.bold),
+          '주소 검색',
+          style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         backgroundColor: Colors.white,
@@ -124,31 +123,23 @@ class _DestinationSelectScreenState extends State<DestinationSelectScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1) 출발지 설정 버튼
-            ElevatedButton.icon(
-              onPressed: _setCurrentLocation,
-              icon: const Icon(Icons.my_location),
-              label: const Text('현재 위치로 출발지 설정'),
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 50),
-              ),
-            ),
-            if (_departureAddress != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                '설정된 출발지: $_departureAddress',
-                style: const TextStyle(fontSize: 14, color: Colors.black54),
-              ),
-            ],
-
-            const SizedBox(height: 30),
+            // if (_departureAddress != null) ...[
+            //   const SizedBox(height: 8),
+            //   Text(
+            //     '설정된 출발지: $_departureAddress',
+            //     style: const TextStyle(fontSize: 14, color: Colors.black54),
+            //   ),
+            // ],
 
             // 2) 목적지 텍스트 입력
             const Text(
-              '목적지를 검색해주세요',
-              style: TextStyle(fontSize: 16),
+              '목적지를\n검색해주세요',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold
+              ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 15),
             TextField(
               controller: _destController,
               decoration: InputDecoration(
@@ -163,10 +154,26 @@ class _DestinationSelectScreenState extends State<DestinationSelectScreen> {
               onSubmitted: _onDestSubmitted,
             ),
 
-            const SizedBox(height: 20),
-            const Text(
-              '예시: 위례성대로 2, 방이동 44-2, 반포 자이',
-              style: TextStyle(color: Colors.black38),
+            const SizedBox(height: 15),
+            // const Text(
+            //   '예시: 위례성대로 2, 방이동 44-2, 반포 자이',
+            //   style: TextStyle(color: Colors.black38),
+            // ),
+            // 1) 출발지 설정 버튼
+            ElevatedButton.icon(
+              onPressed: _setCurrentLocation,
+              icon: const Icon(Icons.my_location),
+              label: const Text(
+                '현재 위치로 찾기',
+              ),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 50),
+                backgroundColor: const Color(0xFF003366),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
             ),
           ],
         ),
