@@ -12,6 +12,7 @@ class ApiConstants {
 
   static const String loginEndpoint = '/api/oauth/login';
   static const String signupEndpoint = '/api/oauth/register';
-  static const String partyEndpoint = '/api/party';
-  static const String partySearch = '/api/party';
+
+  static const String partyEndpoint = '/api/party';          // 생성용
+  static const String partySearchEndpoint = '/api/party/search'; // 검색용
 }
