@@ -1,42 +1,92 @@
+// lib/services/party_service.dart
+
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:app2_client/constants/api_constants.dart';
 import 'package:app2_client/models/party_model.dart';
+import 'package:app2_client/models/party_create_request.dart';
 
 class PartyService {
-  /// 기존 createParty(), getParty(), addStopover() 생략…
-
   /// 주변 팟 조회
-  /// 경로: GET /api/party?lat={lat}&lng={lng}&radius={radiusKm}
-  Future<List<PartyModel>> fetchNearbyParties({
+  static Future<List<PartyModel>> fetchNearbyParties({
     required double lat,
     required double lng,
     required double radiusKm,
+    required String accessToken,
   }) async {
-    final uri = Uri.parse(ApiConstants.baseUrl + ApiConstants.partySearch)
-        .replace(queryParameters: {
-      'lat': lat.toString(),
-      'lng': lng.toString(),
-      'radius': radiusKm.toString(),
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.partySearchEndpoint}');
+
+    final body = jsonEncode({
+      'lat': lat,
+      'lng': lng,
+      'radius': radiusKm,
     });
 
-    final response = await http.get(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-        // 인증 필요하다면 토큰도 넣으세요:
-        // 'Authorization': 'Bearer $token',
-      },
-    );
+    debugPrint('POST $uri');
+    debugPrint('Request body: $body');
 
-    if (response.statusCode == 200) {
-      // 서버에서 [{…}, {…}, …] 형태의 JSON 배열을 내려준다고 가정
-      final List<dynamic> list = jsonDecode(response.body) as List<dynamic>;
-      return list
+    try {
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+        body: body,
+      );
+
+      debugPrint('Response status: ${response.statusCode}');
+      debugPrint('Response body: '
+          '${response.body.length > 200 ? response.body.substring(0, 200) : response.body}');
+
+      if (response.statusCode != 200) {
+        debugPrint('PartyService error ${response.statusCode}, body: ${response.body}');
+        return [];
+      }
+
+      final List<dynamic> jsonList = jsonDecode(response.body) as List<dynamic>;
+      if (jsonList.isEmpty) {
+        debugPrint('ℹ️ 반경 내 파티가 없습니다.');
+      }
+      return jsonList
           .map((e) => PartyModel.fromJson(e as Map<String, dynamic>))
           .toList();
-    } else {
-      throw Exception('주변 팟 조회 실패: ${response.statusCode} ${response.body}');
+    } catch (e) {
+      debugPrint('PartyService.fetchNearbyParties failed: $e');
+      return [];
+    }
+  }
+
+  /// 파티 생성
+  static Future<void> createParty({
+    required PartyCreateRequest request,
+    required String accessToken,
+  }) async {
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.partyEndpoint}');
+    final body = jsonEncode(request.toJson());
+
+    debugPrint('POST $uri');
+    debugPrint('Request body: $body');
+
+    try {
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+        body: body,
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('파티 생성 실패: ${response.statusCode}, ${response.body}');
+      }
+
+      debugPrint('✅ 파티 생성 성공: ${response.body}');
+    } catch (e) {
+      debugPrint('❌ 파티 생성 중 에러: $e');
+      rethrow;
     }
   }
 }
