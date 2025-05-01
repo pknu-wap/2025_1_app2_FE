@@ -36,6 +36,8 @@ dependencies:
   geolocator: ^9.0.2
   geocoding: ^2.0.4
 
+  sign_in_button: ^3.2.0
+
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
@@ -66,7 +68,7 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/google_logo.png
+    - assets/app_wide_logo.png
     - assets/kakao_map.html
     - .env
 
