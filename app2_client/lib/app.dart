@@ -15,7 +15,12 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           fontFamily: 'Pretendard',
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
+          colorScheme: ColorScheme.fromSeed(seedColor: Color(0xFF003366)),
+          outlinedButtonTheme: OutlinedButtonThemeData(
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Color(0xFF003366))
+            )
+          ),
           useMaterial3: true,
         ),
         home: LoginScreen(),

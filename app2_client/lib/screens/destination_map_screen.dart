@@ -13,11 +13,18 @@ class DestinationMapScreen extends StatefulWidget {
   final double initialLng;
   final String initialAddress;
 
+  final double startLat;
+  final double startLng;
+  final String startAddress;
+
   const DestinationMapScreen({
     Key? key,
     required this.initialLat,
     required this.initialLng,
     required this.initialAddress,
+    required this.startLat,
+    required this.startLng,
+    required this.startAddress,
   }) : super(key: key);
 
   @override
@@ -46,7 +53,6 @@ class _DestinationMapScreenState extends State<DestinationMapScreen> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageFinished: (_) {
-            // _controller 에 할당된 이후이므로 안전하게 호출 가능
             _controller?.runJavaScript('map.setLevel(2);');
             setState(() => _pageLoaded = true);
           },
@@ -73,6 +79,9 @@ class _DestinationMapScreenState extends State<DestinationMapScreen> {
             initialLat: lat,
             initialLng: lng,
             initialAddress: widget.initialAddress,
+            startLat: widget.startLat,
+            startLng: widget.startLng,
+            startAddress: widget.startAddress,
           ),
         ),
       );
@@ -106,12 +115,14 @@ class _DestinationMapScreenState extends State<DestinationMapScreen> {
               onPressed: _pageLoaded ? _onConfirmPressed : null,
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
+                backgroundColor: const Color(0xFF003366),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
               child: Text(
                 _pageLoaded ? '이 위치로 목적지 설정' : '지도 로딩 중...',
+                style: const TextStyle(color: Colors.white, fontSize: 18),
               ),
             ),
           ),
