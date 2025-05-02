@@ -85,6 +85,8 @@ flutter:
     - family: jua
       fonts:
         - asset: assets/font/Jua/Jua-Regular.ttf
+
+
   #     fonts:
   #       - asset: fonts/Schyler-Regular.ttf
   #       - asset: fonts/Schyler-Italic.ttf
