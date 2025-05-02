@@ -34,7 +34,7 @@
 ## 🛠️ 기술 스택
 
 - **Frontend**: Flutter
-- **Backend**: Spring Boot (예정)
+- **Backend**: Spring Boot
 - **Database**: MySQL (RDS), Redis
 - **Infra**: AWS EC2, S3
 - **Auth**: Google OAuth2
