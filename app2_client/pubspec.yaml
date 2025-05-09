@@ -30,6 +30,15 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_dotenv: ^5.0.2
+  intl: ^0.17.0
+
+  geolocator: ^9.0.2
+  geocoding: ^2.0.4
+
+  sign_in_button: ^3.2.0
+
+  flutter_native_splash: ^2.4.6
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -62,8 +71,9 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/google_logo.png
+    - assets/app_wide_logo.png
     - assets/kakao_map.html
+    - .env
 
   # To add assets to your application, add an assets section, like this:
   # assets:

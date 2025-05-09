@@ -1,32 +1,66 @@
-import 'package:flutter/material.dart';
-import 'package:app2_client/models/user_model.dart';
+// lib/providers/auth_provider.dart
+import 'package:flutter/foundation.dart';
 import 'package:app2_client/services/auth_service.dart';
+import 'package:app2_client/models/user_model.dart';
 
 class AuthProvider extends ChangeNotifier {
+  final AuthService _authService;
+  AuthResponse? _tokens;
   UserModel? _user;
-  final AuthService _authService = AuthService();
+
+  AuthProvider({AuthService? authService})
+      : _authService = authService ?? AuthService();
 
   UserModel? get user => _user;
+  AuthResponse? get tokens => _tokens;
 
-  Future<bool> login() async {
-    final result = await _authService.loginWithGoogle();
-    if (result != null) {
-      _user = result;
+  /// 로그인 + 서버 인증
+  Future<String> login() async {
+    final u = await _authService.loginWithGoogle();
+    if (u == null) return 'GOOGLE_SIGN_IN_FAILED';
+
+    _user = u;
+
+    final resp = await _authService.loginOnServer(
+      idToken: u.idToken,
+      accessToken: u.accessToken,
+    );
+
+    if (resp != null) {
+      _tokens = resp;
       notifyListeners();
-      return true;
+      return 'SUCCESS';
     }
-    return false;
+
+    return 'MEMBER_NOT_FOUND';
   }
 
-  Future<bool> completeSignup(Map<String, dynamic> additionalInfo) async {
+  /// 회원가입 완료
+  Future<bool> completeSignup({
+    required String name,
+    required String phone,
+    required int age,
+    required String gender,
+    String? profileImageUrl,
+  }) async {
     if (_user == null) return false;
-    // 백엔드에 추가 정보를 전송: 토큰은 기존 _user.token 사용
-    final updatedUser = await _authService.completeSignup(additionalInfo, _user!.token);
-    if (updatedUser != null) {
-      _user = updatedUser;
+
+    final resp = await _authService.registerOnServer(
+      idToken: _user!.idToken,
+      accessToken: _user!.accessToken,
+      name: name,
+      phone: phone,
+      age: age,
+      gender: gender,
+      profileImageUrl: profileImageUrl,
+    );
+
+    if (resp != null) {
+      _tokens = resp;
       notifyListeners();
       return true;
     }
+
     return false;
   }
 }

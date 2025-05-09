@@ -12,6 +12,9 @@
 .swiftpm/
 migrate_working_dir/
 
+# 환경 변수 (API 키 등 민감 정보)
+.env
+
 # IntelliJ related
 *.iml
 *.ipr
@@ -46,3 +49,5 @@ app.*.map.json
 
 #ios 구글로그인
 ios/Runner/GoogleService-Info.plist
+
+devtools_options.yaml

@@ -1,87 +1,191 @@
+// lib/screens/signup_screen.dart
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:app2_client/providers/auth_provider.dart';
+import 'package:app2_client/services/auth_service.dart';
+import 'package:app2_client/screens/destination_select_screen.dart';
+import 'package:app2_client/widgets/phone_number_formatter.dart';
+import 'package:flutter/services.dart';
 
 class SignupScreen extends StatefulWidget {
-  const SignupScreen({super.key});
-
+  final String idToken, accessToken, name, email;
+  const SignupScreen({
+    super.key,
+    required this.idToken,
+    required this.accessToken,
+    required this.name,
+    required this.email,
+  });
   @override
-  _SignupScreenState createState() => _SignupScreenState();
+  State<SignupScreen> createState() => _SignupScreenState();
 }
 
 class _SignupScreenState extends State<SignupScreen> {
-  final _formKey = GlobalKey<FormState>();
-  String _name = '';
-  String _phone = '';
-  String _age = '';
-  String? _gender;
+  final _form = GlobalKey<FormState>();
+  String _phone = '', _age = '20', _gender = 'MALE';
 
-  void _submit() async {
-    if (_formKey.currentState!.validate()) {
-      _formKey.currentState!.save();
-      final additionalInfo = {
-        'name': _name,
-        'phone': _phone,
-        'age': _age,
-        'gender': _gender,
-      };
+  Future<void> _submit() async {
+    if (!_form.currentState!.validate()) return;
+    _form.currentState!.save();
 
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final success = await authProvider.completeSignup(additionalInfo);
+    final resp = await AuthService().registerOnServer(
+      idToken: widget.idToken,
+      accessToken: widget.accessToken,
+      name: widget.name,
+      phone: _phone,
+      age: 20, //현재 나이 필드에대한 가이드 존재 X, 따라서 하드코딩
+      gender: _gender,
+    );
 
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("회원가입이 완료되었습니다!")),
-        );
-        // 임시: 홈 화면이 없으므로 로그인 화면 등 다른 적절한 화면으로 이동하거나
-        // 그냥 현재 상태를 유지할 수 있습니다.
-        // 예: Navigator.pop(context);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("회원가입 실패")),
-        );
-      }
+    if (resp != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('회원가입 완료!')),
+      );
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const DestinationSelectScreen()),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('회원가입 실패')),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final genderOptions = ['남', '여'];
-
     return Scaffold(
-      appBar: AppBar(title: const Text("회원가입")),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              TextFormField(
-                decoration: const InputDecoration(labelText: "이름"),
-                onSaved: (val) => _name = val ?? '',
-                validator: (val) =>
-                val == null || val.isEmpty ? "이름을 입력하세요" : null,
-              ),
-              TextFormField(
-                decoration: const InputDecoration(labelText: "휴대폰 번호"),
-                keyboardType: TextInputType.phone,
-                onSaved: (val) => _phone = val ?? '',
-                validator: (val) =>
-                val == null || val.isEmpty ? "휴대폰 번호를 입력하세요" : null,
-              ),
-              TextFormField(
-                decoration: const InputDecoration(labelText: "나이"),
-                keyboardType: TextInputType.number,
-                onSaved: (val) => _age = val ?? '',
-                validator: (val) =>
-                val == null || val.isEmpty ? "나이를 입력하세요" : null,
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _submit,
-                child: const Text("회원가입 완료"),
-              ),
-            ],
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          child: Form(
+            key: _form,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '회원 정보 입력',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  '회원여부 확인 및 가입을 진행합니다.',
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+                SizedBox(height: 32),
+
+                // 이름
+                Text('이름'),
+                SizedBox(height: 8),
+                TextFormField(
+                  initialValue: widget.name,
+                  readOnly: true,
+                  decoration: InputDecoration(
+                    hintText: '이름',
+                    filled: false,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                          color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 24),
+
+                Text('성별'),
+                SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => setState(() => _gender = 'MALE'),
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: null,
+                          side: BorderSide(
+                            color: _gender == 'MALE'
+                                ? Theme.of(context).colorScheme.primary
+                                : Colors.grey.shade400,
+                          ),
+                          foregroundColor: _gender == 'MALE'
+                              ? Theme.of(context).colorScheme.primary
+                              : Colors.grey.shade600,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: const Text('남자'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => setState(() => _gender = 'FEMALE'),
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: null,
+                          side: BorderSide(
+                            color: _gender == 'FEMALE'
+                                ? Theme.of(context).colorScheme.primary
+                                : Colors.grey.shade400,
+                          ),
+                          foregroundColor: _gender == 'FEMALE'
+                              ? Theme.of(context).colorScheme.primary
+                              : Colors.grey.shade600,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: const Text('여자'),
+                      ),
+                    ),
+                  ],
+                ),
+
+                SizedBox(height: 24),
+
+                Text('전화번호'),
+                SizedBox(height: 8),
+                TextFormField(
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [
+                    LengthLimitingTextInputFormatter(13), // 하이픈 포함 시 최대 13자
+                    FilteringTextInputFormatter.digitsOnly,
+                    PhoneNumberFormatter()],
+                  decoration: InputDecoration(
+                    hintText: '전화번호 입력',
+                    filled: false,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ),
+                  onSaved: (v) => _phone = v!,
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return '필수 입력';
+                    if (!v.startsWith('010')) return '알맞지 않은 전화번호입니다';
+                    return null;
+                  },
+                ),
+                SizedBox(height: 32),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: _submit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFF003366),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text('회원가입',style: TextStyle(color: Colors.white, fontSize: 18),),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
