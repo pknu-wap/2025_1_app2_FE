@@ -68,7 +68,14 @@ class _DestinationMapScreenState extends State<DestinationMapScreen> {
     try {
       final raw = await _controller!
           .runJavaScriptReturningResult('getSelectedDestination()');
-      final coord = jsonDecode(raw.toString()) as Map<String, dynamic>;
+      dynamic result = raw;
+
+      final first = result is String ? jsonDecode(result) : result;
+
+      //android는 디코딩후에도 '"{\\"lat\\":35.134032,\\"lng\\":129.1031735}"' 문자열에 감싸져있을 수 있음
+      final decoded = first is String ? jsonDecode(first) : first;
+
+      final coord = decoded as Map<String, dynamic>;
       final lat = coord['lat'] as double;
       final lng = coord['lng'] as double;
 
