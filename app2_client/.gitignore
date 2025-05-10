@@ -46,6 +46,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/app/keystore
 
 #ios 구글로그인
 ios/Runner/GoogleService-Info.plist
