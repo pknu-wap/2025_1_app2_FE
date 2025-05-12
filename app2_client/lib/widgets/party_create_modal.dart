@@ -125,7 +125,7 @@ class _PartyCreateModalState extends State<PartyCreateModal> {
                 const Text('최대 인원'),
                 DropdownButton<int>(
                   value: _maxPerson,
-                  items: [1,2,3,4,5]
+                  items: [1,2,3,4]
                       .map((n) => DropdownMenuItem(
                       value: n, child: Text('$n명'))).toList(),
                   onChanged: (v) => setState(() => _maxPerson = v!),

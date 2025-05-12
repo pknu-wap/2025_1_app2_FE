@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:app2_client/screens/destination_map_screen.dart';
+import 'package:app2_client/screens/start_map_screen.dart';
 
 class DestinationSelectScreen extends StatefulWidget {
   const DestinationSelectScreen({Key? key}) : super(key: key);
@@ -18,35 +19,19 @@ class _DestinationSelectScreenState extends State<DestinationSelectScreen> {
   String? _departureAddress;
   final TextEditingController _destController = TextEditingController();
 
-  Future<void> _setCurrentLocation() async {
-    LocationPermission perm = await Geolocator.checkPermission();
-    if (perm == LocationPermission.denied) {
-      perm = await Geolocator.requestPermission();
-      if (perm == LocationPermission.denied) {
-        _showError('위치 권한이 거부되었습니다.');
-        return;
-      }
-    }
-    if (perm == LocationPermission.deniedForever) {
-      _showError('앱 설정에서 위치 권한을 허용해주세요.');
-      return;
-    }
+  Future<void> _selectStartFromMap() async {
+    final result = await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const StartMapScreen()),
+    );
 
-    Position pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-    String address;
-    try {
-      var places = await placemarkFromCoordinates(pos.latitude, pos.longitude);
-      var p = places.first;
-      address = '${p.street}, ${p.locality}, ${p.country}';
-    } catch (_) {
-      address = '현재 위치';
+    if (result != null && result is Map) {
+      setState(() {
+        _departureLat = result['lat'];
+        _departureLng = result['lng'];
+        _departureAddress = result['address'];
+      });
     }
-
-    setState(() {
-      _departureLat = pos.latitude;
-      _departureLng = pos.longitude;
-      _departureAddress = address;
-    });
   }
 
   Future<void> _onDestSubmitted(String value) async {
@@ -119,9 +104,9 @@ class _DestinationSelectScreenState extends State<DestinationSelectScreen> {
             ),
             const SizedBox(height: 10),
             ElevatedButton.icon(
-              onPressed: _setCurrentLocation,
-              icon: const Icon(Icons.my_location),
-              label: const Text('현재 위치로 설정'),
+              onPressed: _selectStartFromMap,
+              icon: const Icon(Icons.map),
+              label: const Text('지도에서 출발지 설정'),
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 50),
                 backgroundColor: const Color(0xFF003366),
