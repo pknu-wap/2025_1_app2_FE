@@ -136,3 +136,5 @@ class _FareResultScreenState extends State<FareResultScreen> {
     );
   }
 }
+
+// 이슈번호 16
