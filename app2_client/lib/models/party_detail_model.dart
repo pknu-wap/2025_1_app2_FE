@@ -44,16 +44,22 @@ class PartyDetail {
   });
 
   factory PartyDetail.fromJson(Map<String, dynamic> json) {
-    final memberList = (json['party_members'] as List)
-        .map((m) => PartyMember.fromJson(m))
-        .toList();
+    final originAddress =
+        json['party_start']?['location']?['address'] ?? '출발지 정보 없음';
+    final destAddress =
+        json['party_destination']?['location']?['address'] ?? '도착지 정보 없음';
+
+    final memberList = (json['party_members'] as List<dynamic>?)
+        ?.map((m) => PartyMember.fromJson(m))
+        .toList() ??
+        [];
 
     return PartyDetail(
       partyId: json['party_id'],
-      originAddress: json['origin'] ?? '출발지 정보 없음',
-      destAddress: json['destination'] ?? '도착지 정보 없음',
+      originAddress: originAddress,
+      destAddress: destAddress,
       radius: (json['party_radius'] as num).toDouble(),
-      maxPerson: json['party_max_person'],
+      maxPerson: json['party_max_people'],
       partyOption: json['party_option'],
       members: memberList,
     );

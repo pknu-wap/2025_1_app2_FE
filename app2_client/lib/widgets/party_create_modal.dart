@@ -4,12 +4,13 @@ import 'package:provider/provider.dart';
 import 'package:app2_client/models/party_create_request.dart';
 import 'package:app2_client/services/party_service.dart';
 import 'package:app2_client/providers/auth_provider.dart';
+import 'package:app2_client/models/party_detail_model.dart'; // PartyDetail import 필요
 
 class PartyCreateModal extends StatefulWidget {
   final double startLat, startLng;
-  final String  startAddress;
+  final String startAddress;
   final double destLat, destLng;
-  final String  destAddress;
+  final String destAddress;
 
   const PartyCreateModal({
     super.key,
@@ -26,9 +27,9 @@ class PartyCreateModal extends StatefulWidget {
 }
 
 class _PartyCreateModalState extends State<PartyCreateModal> {
-  double  _radius    = 1000;   // m
-  int     _maxPerson = 3;
-  String  _option    = 'MIXED';
+  double _radius = 1000; // m
+  int _maxPerson = 3;
+  String _option = 'MIXED';
 
   Future<void> _submit() async {
     final token = context.read<AuthProvider>().tokens?.accessToken;
@@ -56,29 +57,30 @@ class _PartyCreateModalState extends State<PartyCreateModal> {
     );
 
     try {
-      await PartyService.createParty(request: req, accessToken: token);
-      if (mounted) {
-        Navigator.pop(context);
+      final party = await PartyService.createParty(
+        request: req,
+        accessToken: token,
+      ); // 🎯 응답 받은 PartyDetail
 
-        // 내 파티 페이지로 이동
+      if (mounted) {
+        Navigator.pop(context); // 모달 닫기
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const MyPartyScreen()),
+          MaterialPageRoute(builder: (_) => MyPartyScreen(party: party)),
         );
-
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('파티가 생성되었습니다')),
         );
       }
-    } catch (_) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('파티 생성 실패')));
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('파티 생성 실패: $e')),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // 바텀시트 안쪽은 스크롤 가능하도록 SingleChildScrollView
     return SafeArea(
       child: SingleChildScrollView(
         padding: EdgeInsets.only(
@@ -99,28 +101,25 @@ class _PartyCreateModalState extends State<PartyCreateModal> {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const Text('파티 생성', style: TextStyle(
-                fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text('파티 생성',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 20),
-
-            Align(alignment: Alignment.centerLeft,
-                child: Text('출발: ${widget.startAddress}')),
-            Align(alignment: Alignment.centerLeft,
-                child: Text('도착: ${widget.destAddress}')),
+            Align(alignment: Alignment.centerLeft, child: Text('출발: ${widget.startAddress}')),
+            Align(alignment: Alignment.centerLeft, child: Text('도착: ${widget.destAddress}')),
             const Divider(height: 32),
 
             // 반경
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('반경: ${(_radius/1000).toStringAsFixed(1)} km'),
+                Text('반경: ${(_radius / 1000).toStringAsFixed(1)} km'),
                 Expanded(
                   child: Slider(
-                    min: 1000,            // 1km
-                    max: 10000,           // 10km
+                    min: 1000,
+                    max: 10000,
                     divisions: 9,
                     value: _radius,
-                    label: '${(_radius/1000).toStringAsFixed(1)} km',
+                    label: '${(_radius / 1000).toStringAsFixed(1)} km',
                     onChanged: (v) => setState(() => _radius = v),
                   ),
                 ),
@@ -134,9 +133,9 @@ class _PartyCreateModalState extends State<PartyCreateModal> {
                 const Text('최대 인원'),
                 DropdownButton<int>(
                   value: _maxPerson,
-                  items: [1,2,3,4]
-                      .map((n) => DropdownMenuItem(
-                      value: n, child: Text('$n명'))).toList(),
+                  items: [1, 2, 3, 4]
+                      .map((n) => DropdownMenuItem(value: n, child: Text('$n명')))
+                      .toList(),
                   onChanged: (v) => setState(() => _maxPerson = v!),
                 ),
               ],
@@ -149,10 +148,11 @@ class _PartyCreateModalState extends State<PartyCreateModal> {
                 const Text('팟 옵션'),
                 DropdownButton<String>(
                   value: _option,
-                  items: ['MIXED','ONLY']
+                  items: ['MIXED', 'ONLY']
                       .map((o) => DropdownMenuItem(
-                      value: o,
-                      child: Text(o=='MIXED' ? '혼성' : '동성만')))
+                    value: o,
+                    child: Text(o == 'MIXED' ? '혼성' : '동성만'),
+                  ))
                       .toList(),
                   onChanged: (v) => setState(() => _option = v!),
                 ),
@@ -165,7 +165,8 @@ class _PartyCreateModalState extends State<PartyCreateModal> {
               child: ElevatedButton(
                 onPressed: _submit,
                 style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
                 child: const Text('생성하기'),
               ),
             ),
