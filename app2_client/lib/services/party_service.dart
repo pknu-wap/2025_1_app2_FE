@@ -89,4 +89,24 @@ class PartyService {
       rethrow;
     }
   }
+
+  /// 파티 참여
+  static Future<void> attendParty({
+    required String partyId,
+    required String accessToken,
+  }) async {
+    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.partyEndpoint}/$partyId/attend');
+
+    final response = await http.post(
+      uri,
+      headers: {
+        'Authorization': 'Bearer $accessToken',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('파티 참여 실패: ${response.body}');
+    }
+  }
 }
