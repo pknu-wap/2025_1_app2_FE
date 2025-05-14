@@ -1,11 +1,11 @@
-// lib/services/party_service.dart
-
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+
 import 'package:app2_client/constants/api_constants.dart';
 import 'package:app2_client/models/party_model.dart';
 import 'package:app2_client/models/party_create_request.dart';
+import 'package:app2_client/models/party_detail_model.dart';
 
 class PartyService {
   /// 주변 팟 조회
@@ -58,8 +58,8 @@ class PartyService {
     }
   }
 
-  /// 파티 생성
-  static Future<void> createParty({
+  /// ✅ 파티 생성 (응답을 PartyDetail로 반환)
+  static Future<PartyDetail> createParty({
     required PartyCreateRequest request,
     required String accessToken,
   }) async {
@@ -84,6 +84,8 @@ class PartyService {
       }
 
       debugPrint('✅ 파티 생성 성공: ${response.body}');
+      final json = jsonDecode(response.body);
+      return PartyDetail.fromJson(json); // ✅ 응답을 모델로 변환하여 리턴
     } catch (e) {
       debugPrint('❌ 파티 생성 중 에러: $e');
       rethrow;
@@ -107,6 +109,32 @@ class PartyService {
 
     if (response.statusCode != 200) {
       throw Exception('파티 참여 실패: ${response.body}');
+    }
+  }
+
+  /// 내가 만든 파티 조회 (백엔드에서 API 준비된 경우)
+  static Future<PartyDetail?> getMyParty(String accessToken) async {
+    final uri = Uri.parse('${ApiConstants.baseUrl}/api/party/my');
+
+    try {
+      final res = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $accessToken',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (res.statusCode == 200) {
+        final json = jsonDecode(res.body);
+        return PartyDetail.fromJson(json);
+      } else {
+        debugPrint('❌ getMyParty 실패: ${res.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('❌ getMyParty 예외: $e');
+      return null;
     }
   }
 }
