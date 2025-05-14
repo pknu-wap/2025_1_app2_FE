@@ -7,6 +7,8 @@ import 'package:app2_client/constants/api_constants.dart';
 import 'package:app2_client/models/party_model.dart';
 import 'package:app2_client/models/party_create_request.dart';
 
+import '../models/party_detail_model.dart';
+
 class PartyService {
   /// 주변 팟 조회
   static Future<List<PartyModel>> fetchNearbyParties({
@@ -107,6 +109,31 @@ class PartyService {
 
     if (response.statusCode != 200) {
       throw Exception('파티 참여 실패: ${response.body}');
+    }
+  }
+
+  static Future<PartyDetail?> getMyParty(String accessToken) async {
+    final uri = Uri.parse('${ApiConstants.baseUrl}/api/party/my');
+
+    try {
+      final res = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $accessToken',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (res.statusCode == 200) {
+        final json = jsonDecode(res.body);
+        return PartyDetail.fromJson(json);
+      } else {
+        debugPrint('❌ getMyParty 실패: ${res.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('❌ getMyParty 예외: $e');
+      return null;
     }
   }
 }

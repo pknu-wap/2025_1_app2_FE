@@ -1,3 +1,4 @@
+import 'package:app2_client/screens/my_party_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:app2_client/models/party_create_request.dart';
@@ -57,9 +58,17 @@ class _PartyCreateModalState extends State<PartyCreateModal> {
     try {
       await PartyService.createParty(request: req, accessToken: token);
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('파티가 생성되었습니다!')));
         Navigator.pop(context);
+
+        // 내 파티 페이지로 이동
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const MyPartyScreen()),
+        );
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('파티가 생성되었습니다')),
+        );
       }
     } catch (_) {
       ScaffoldMessenger.of(context)
