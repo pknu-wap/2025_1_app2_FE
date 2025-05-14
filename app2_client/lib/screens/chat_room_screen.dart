@@ -8,13 +8,9 @@ class ChatRoomScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         leading: BackButton(),
-        title: const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('택시 모임 4', style: TextStyle(fontSize: 18)),
-            Text('부경대학교 정문 ➤ 서면 삼정타워',
-                style: TextStyle(fontSize: 12, color: Colors.grey)),
-          ],
+        title: const Text(
+          '택시 모임 4',
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
         ),
         actions: const [
           Padding(
@@ -22,27 +18,42 @@ class ChatRoomScreen extends StatelessWidget {
             child: Icon(Icons.person_outline),
           )
         ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(24),
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 8.0),
-            child: Text(
-              '5월 23일 (금) 22:30 출발',
-              style: TextStyle(fontSize: 12, color: Colors.black54),
-            ),
-          ),
-        ),
+        elevation: 0,
       ),
       body: Column(
         children: [
-          // 파티 생성 메시지
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
-            child: Text(
-              'oo님이 파티를 생성했습니다.',
-              style: TextStyle(color: Colors.grey),
+          // 목적지 정보 박스
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black12,
+                  blurRadius: 4,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  '부경대학교 정문 ➤ 서면 삼정타워',
+                  style: TextStyle(fontSize: 14),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  '5월 23일 (금) 22:30 출발',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
             ),
           ),
+
           // 채팅 메시지 영역
           Expanded(
             child: ListView(
@@ -50,12 +61,11 @@ class ChatRoomScreen extends StatelessWidget {
               children: const [
                 ChatBubble(isMine: false, name: '이름', message: '채팅 내용'),
                 ChatBubble(isMine: true, name: '나', message: '채팅 내용'),
-                ChatBubble(isMine: false, name: '이름', message: '채팅 내용'),
-                ChatBubble(isMine: false, name: '이름', message: '채팅 내용'),
               ],
             ),
           ),
-          // 입력창
+
+          // 메시지 입력창
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             color: Colors.grey.shade200,
@@ -67,8 +77,7 @@ class ChatRoomScreen extends StatelessWidget {
                       hintText: '메시지를 입력하세요',
                       filled: true,
                       fillColor: Colors.white,
-                      contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(30),
                         borderSide: const BorderSide(color: Colors.blue),
@@ -95,7 +104,7 @@ class ChatRoomScreen extends StatelessWidget {
   }
 }
 
-// 🔹 말풍선 위젯
+// 말풍선 위젯
 class ChatBubble extends StatelessWidget {
   final bool isMine;
   final String name;
