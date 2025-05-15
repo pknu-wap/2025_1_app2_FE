@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:app2_client/models/party_model.dart';
+import 'package:provider/provider.dart';
+import 'package:app2_client/providers/auth_provider.dart';
+import '../services/party_service.dart';
 
 class PartyJoinModal extends StatelessWidget {
   final PartyModel pot;
@@ -53,9 +56,30 @@ class PartyJoinModal extends StatelessWidget {
               Text('도착: ${pot.destAddress}'),
               const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: () {
-                  // TODO: 팟 신청 API 호출
-                  Navigator.pop(context);
+                onPressed: () async {
+                  final token = context.read<AuthProvider>().tokens?.accessToken;
+
+                  if (token == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('로그인이 필요합니다.')),
+                    );
+                    return;
+                  }
+
+                  try {
+                    await PartyService.attendParty(
+                      partyId: pot.id,
+                      accessToken: token,
+                    );
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('파티에 참가했습니다!')),
+                    );
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('참가 실패: $e')),
+                    );
+                  }
                 },
                 child: const Text('팟 신청하기'),
               ),
