@@ -20,7 +20,7 @@ class _FareResultScreenState extends State<FareResultScreen> {
   // 임시 파티원 데이터
   final List<Map<String, dynamic>> users = [
     {'name': '사용자 A', 'fare': '₩3,000', 'confirmed': false},
-    {'name': '사용자 B', 'fare': '₩2,500', 'confirmed': false},
+    {'name': '사용자 B', 'fare': '₩2,500', 'confirmed': false, 'isMe': true},
     {'name': '사용자 C', 'fare': '₩3,800', 'confirmed': false},
     {'name': '사용자 D', 'fare': '₩2,900', 'confirmed': false},
   ];
@@ -66,10 +66,52 @@ class _FareResultScreenState extends State<FareResultScreen> {
               itemCount: users.length,
               itemBuilder: (context, index) {
                 final user = users[index];
+                final bool isMe = user['isMe'] == true;
                 final bool isConfirmed = user['confirmed'] == true;
                 final String buttonText = widget.isBookkeeper
-                    ? (isConfirmed ? '돈받음' : '정산완')
-                    : (isConfirmed ? '송금완' : '확인요청함');
+                    ? (isConfirmed ? '정산완' : '돈받음')
+                    : (isConfirmed ? '송금완' : '확인요청');
+                // Only show the button for 'isMe' user if this is the .user() constructor (not bookkeeper)
+                if (!widget.isBookkeeper && !isMe) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Row(
+                            children: [
+                              const CircleAvatar(child: Icon(Icons.person)),
+                              const SizedBox(width: 12),
+                              SizedBox(
+                                width: 100,
+                                child: Text(
+                                  user['name'],
+                                  style: const TextStyle(fontSize: 16),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              SizedBox(
+                                width: 70,
+                                child: Text(
+                                  user['fare'],
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                  textAlign: TextAlign.right,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // No button
+                      ],
+                    ),
+                  );
+                }
                 return Container(
                   margin: const EdgeInsets.only(bottom: 6),
                   padding: const EdgeInsets.all(12),
@@ -80,25 +122,39 @@ class _FareResultScreenState extends State<FareResultScreen> {
                   ),
                   child: Row(
                     children: [
-                      const CircleAvatar(child: Icon(Icons.person)),
-                      const SizedBox(width: 12),
                       Expanded(
-                        child: Text(
-                          user['name'],
-                          style: const TextStyle(fontSize: 16),
+                        child: Row(
+                          children: [
+                            const CircleAvatar(child: Icon(Icons.person)),
+                            const SizedBox(width: 12),
+                            SizedBox(
+                              width: 100,
+                              child: Text(
+                                user['name'],
+                                style: const TextStyle(fontSize: 16),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            SizedBox(
+                              width: 70,
+                              child: Text(
+                                user['fare'],
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                                textAlign: TextAlign.right,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      Text(
-                        user['fare'],
-                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(width: 12),
                       ElevatedButton(
-                        onPressed: () {
-                          setState(() {
-                            user['confirmed'] = !(user['confirmed'] ?? false);
-                          });
-                        },
+                        onPressed: widget.isBookkeeper || isMe
+                            ? () {
+                                setState(() {
+                                  user['confirmed'] = !(user['confirmed'] ?? false);
+                                });
+                              }
+                            : null,
                         child: Text(buttonText),
                       ),
                     ],
