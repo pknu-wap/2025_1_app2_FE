@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 
+void main() => runApp(const MaterialApp(home: ReviewPage(), debugShowCheckedModeBanner: false));
+
 class ReviewPage extends StatefulWidget {
   const ReviewPage({super.key});
 
@@ -9,230 +11,184 @@ class ReviewPage extends StatefulWidget {
 }
 
 class _ReviewPageState extends State<ReviewPage> {
-  final List<String> passengers = ['차은우', '아이유', '지디'];
+  final List<Map<String, dynamic>> members = [
+    {'name': '김*서', 'role': '방장'},
+    {'name': '김*서', 'role': '팀원'},
+    {'name': '김*서', 'role': '팀원'},
+    {'name': '김*서', 'role': '팀원'},
+    {'name': '김*서', 'role': '팀원'},
+  ];
 
-  Map<String, double> ratings = {}; // ⭐ 별점 저장
-  Map<String, Set<int>> selections = {}; // ✅ 문장 체크 상태 저장
+  final List<String> allTags = [
+    '시간 엄수', '소통 원활', '친절한 태도',
+    '상대 존중', '위치 배려', '탑승 만족 👍',
+    '굿 매너', '재탑승 희망', '매너 정산러',
+  ];
 
-  void saveReview(String name, double rating, Set<int> selected) {
-    setState(() {
-      ratings[name] = rating;
-      selections[name] = selected;
-    });
-  }
+  final Map<int, double> ratings = {};
+  final Map<int, Set<String>> selectedTags = {};
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('리뷰할 팀원 선택')),
-      body: ListView.builder(
-        itemCount: passengers.length,
-        itemBuilder: (context, index) {
-          final passenger = passengers[index];
-          final hasReview = ratings.containsKey(passenger);
+      appBar: AppBar(title: const Text('파티원 평가하기')),
+      body: Scrollbar( // ✅ 스크롤바 추가
+        thumbVisibility: true, // 항상 보이게
+        child: ListView.builder(
+          padding: const EdgeInsets.only(bottom: 100), // ✅ 버튼 안 가리도록 여백 추가
+          itemCount: members.length,
+          itemBuilder: (context, index) {
+            final member = members[index];
 
-          return ListTile(
-            title: Text(passenger, style: const TextStyle(fontSize: 20, fontFamily: 'jua')),
-            trailing: hasReview
-                ? TextButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => IndividualReviewPage(
-                      passenger: passenger,
-                      initialRating: ratings[passenger] ?? 0,
-                      initialSelections: selections[passenger] ?? {},
-                      onComplete: (rating, selected) =>
-                          saveReview(passenger, rating, selected),
-                    ),
-                  ),
-                );
-              },
-              child: const Text('수정', style: TextStyle(color: Colors.orange)),
-            )
-                : const Icon(Icons.arrow_forward_ios),
-            onTap: hasReview
-                ? null
-                : () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => IndividualReviewPage(
-                    passenger: passenger,
-                    onComplete: (rating, selected) =>
-                        saveReview(passenger, rating, selected),
-                  ),
+            return Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
+                  ],
                 ),
-              );
-            },
-          );
-        },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 이름 + 역할 + 별점
+                    Row(
+                      children: [
+                        const CircleAvatar(radius: 20, backgroundColor: Colors.grey),
+                        const SizedBox(width: 20),
+                        Text(member['name'],
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 17),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF6C651),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            member['role'],
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        RatingBar.builder(
+                          initialRating: ratings[index] ?? 0,
+                          itemSize: 30,
+                          minRating: 0,
+                          allowHalfRating: false,
+                          itemBuilder: (_, __) => const Icon(Icons.star, color: Colors.amber),
+                          unratedColor: Colors.grey.shade300,
+                          onRatingUpdate: (value) {
+                            setState(() {
+                              ratings[index] = value;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
+                    // 후기 키워드 전체 행
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // "후기 키워드" 박스
+                        Container(
+                          margin: const EdgeInsets.only(right: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1F355F),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            '후기 키워드',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        // 키워드들 세 줄 정렬
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: List.generate(3, (rowIndex) {
+                              final tagsForRow = allTags.skip(rowIndex * 3).take(3).toList();
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Row(
+                                  children: tagsForRow.map((tag) {
+                                    final selected = selectedTags[index]?.contains(tag) ?? false;
+                                    return GestureDetector(
+                                      onTap: () {
+                                        setState(() {
+                                          selectedTags[index] ??= {};
+                                          if (selected) {
+                                            selectedTags[index]!.remove(tag);
+                                          } else {
+                                            selectedTags[index]!.add(tag);
+                                          }
+                                        });
+                                      },
+                                      child: Container(
+                                        margin: const EdgeInsets.only(right: 8),
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: selected ? const Color(0xFFEAF1FB) : Colors.grey.shade200,
+                                          borderRadius: BorderRadius.circular(20),
+                                          border: selected
+                                              ? Border.all(color: const Color(0xFF5271FF), width: 1.5)
+                                              : null,
+                                        ),
+                                        child: Text(
+                                          '#$tag',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: selected ? const Color(0xFF1F355F) : Colors.grey,
+                                            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              );
+                            }),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
       ),
-    );
-  }
-}
 
-class IndividualReviewPage extends StatefulWidget {
-  final String passenger;
-  final double initialRating;
-  final Set<int> initialSelections;
-  final Function(double, Set<int>) onComplete;
-
-  const IndividualReviewPage({
-    super.key,
-    required this.passenger,
-    this.initialRating = 0,
-    this.initialSelections = const {},
-    required this.onComplete,
-  });
-
-  @override
-  State<IndividualReviewPage> createState() => _IndividualReviewPageState();
-}
-
-class _IndividualReviewPageState extends State<IndividualReviewPage> {
-  late double rating;
-  late Set<int> selectedIndexes;
-
-  @override
-  void initState() {
-    super.initState();
-    rating = widget.initialRating;
-    selectedIndexes = {...widget.initialSelections};
-  }
-
-  List<String> getSentences(double rating) {
-    if (rating == 5) return [
-      '시간 약속을 잘 지켜요',
-      '소통이 잘 돼요',
-      '매너가 좋아요',
-      '말투와 태도가 친절해요',
-      '탑승, 하차 위치를 배려해줬어요',
-      '불편한 상황 없이 잘 마무리됐어요',
-      '함께 타는 사람들을 존중해요',
-      '다음에도 같이 타고 싶어요',
-      '목적지까지 경로를 함께 고민해줬어요',
-      '인사를 잘 해줘요'
-    ];
-    if (rating == 4) return [
-      '전반적으로 괜찮았어요',
-      '대체로 예의 바른 편이에요',
-      '편안하게 이동할 수 있었어요',
-      '기분 좋은 대화가 있었어요',
-      '한두 가지 아쉬움이 있었지만 무난했어요'
-    ];
-    if (rating == 3) return [
-      '무난했어요',
-      '크게 문제는 없었어요',
-      '조금 어색했지만 괜찮았어요',
-      '조용히 갔어요',
-    ];
-    if (rating == 2) return [
-      '약속 시간에 늦었어요',
-      '소통이 잘 안 됐어요',
-      '탑승 위치가 헷갈렸어요',
-      '예의가 조금 아쉬웠어요'
-    ];
-    if (rating == 1) return [
-      '지각을 했어요',
-      '불쾌한 태도가 있었어요',
-      '대화가 불편했어요',
-      '배려가 부족했어요',
-      '다시 함께 타고 싶지 않아요'
-    ];
-    return [];
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final sentences = getSentences(rating);
-
-    return Scaffold(
-      appBar: AppBar(title: Text('${widget.passenger} 평가')),
-      body: Padding(
+      // ✅ 하단 제출 버튼
+      bottomNavigationBar: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: rating == 0
-            ? Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const SizedBox(height: 60),
-            Center(
-              child: Text(widget.passenger,
-                  style: const TextStyle(fontSize: 22, fontFamily: 'jua')),
+        child: ElevatedButton(
+          onPressed: () {
+            // TODO: 제출 로직 작성
+            print('제출됨!');
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF1F355F),
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
-            const SizedBox(height: 16),
-            Center(
-              child: RatingBar.builder(
-                initialRating: 0,
-                minRating: 0,
-                itemBuilder: (_, __) =>
-                const Icon(Icons.star, color: Colors.amber),
-                itemCount: 5,
-                allowHalfRating: false,
-                onRatingUpdate: (value) {
-                  setState(() {
-                    rating = value;
-                    selectedIndexes.clear();
-                  });
-                },
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Center(
-              child: Text('⭐ 별점을 먼저 선택해주세요',
-                  style: TextStyle(color: Colors.grey)),
-            ),
-          ],
-        )
-            : Column(
-          children: [
-            Text(widget.passenger,
-                style: const TextStyle(fontSize: 22, fontFamily: 'jua')),
-            const SizedBox(height: 10),
-            RatingBar.builder(
-              initialRating: rating,
-              minRating: 0,
-              itemBuilder: (_, __) =>
-              const Icon(Icons.star, color: Colors.amber),
-              itemCount: 5,
-              allowHalfRating: false,
-              onRatingUpdate: (value) {
-                setState(() {
-                  rating = value;
-                  selectedIndexes.clear();
-                });
-              },
-            ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: ListView.builder(
-                itemCount: sentences.length,
-                itemBuilder: (context, index) {
-                  return CheckboxListTile(
-                    title: Text(sentences[index]),
-                    value: selectedIndexes.contains(index),
-                    onChanged: (val) {
-                      setState(() {
-                        if (val == true) {
-                          selectedIndexes.add(index);
-                        } else {
-                          selectedIndexes.remove(index);
-                        }
-                      });
-                    },
-                  );
-                },
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                widget.onComplete(rating, selectedIndexes);
-                Navigator.pop(context);
-              },
-              child: const Text('완료'),
-            ),
-          ],
+          ),
+          child: const Text(
+            '평가 제출하기',
+            style: TextStyle(fontSize: 16, fontFamily: 'jua', color: Colors.white),
+          ),
         ),
       ),
     );
