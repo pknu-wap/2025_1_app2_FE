@@ -4,6 +4,7 @@ import 'package:app2_client/services/auth_service.dart';
 import 'package:app2_client/screens/destination_select_screen.dart';
 import 'package:app2_client/widgets/phone_number_formatter.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SignupScreen extends StatefulWidget {
   final String idToken, accessToken, name, email;
@@ -36,6 +37,10 @@ class _SignupScreenState extends State<SignupScreen> {
     );
 
     if (resp != null) {
+      // ✅ accessToken 저장
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('accessToken', widget.accessToken);
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('회원가입 완료!')),
       );
@@ -43,7 +48,8 @@ class _SignupScreenState extends State<SignupScreen> {
         context,
         MaterialPageRoute(builder: (_) => const DestinationSelectScreen()),
       );
-    } else {
+    }
+    else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('회원가입 실패')),
       );
