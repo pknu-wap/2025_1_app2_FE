@@ -1,18 +1,70 @@
-// lib/screens/my_page_content.dart
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:app2_client/services/profile_service.dart';
 
-class MyPage extends StatelessWidget {
-  MyPage({super.key});
+class MyPage extends StatefulWidget {
+  const MyPage({super.key});
 
-  final String name = '이름 입력';
-  final String age = '19';
-  final String gender = '여';
-  final String phone = '010 - 1234 - 5678';
-  final double rating = 3.2;
-  final List<String> tags = ['친절', '시간 엄수'];
+  @override
+  State<MyPage> createState() => _MyPageState();
+}
+
+class _MyPageState extends State<MyPage> {
+  String name = '';
+  String phone = '';
+  String gender = '';
+  int age = 0;
+  double rating = 3.2;
+  List<String> tags = ['친절', '시간 엄수'];
+
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchProfile();
+  }
+
+  Future<void> fetchProfile() async {
+    try {
+      final accessToken = await getAccessToken();
+      final profile = await ProfileService().getProfile(accessToken);
+
+      if (profile != null) {
+        setState(() {
+          name = profile['name'] ?? '이름 없음';
+          phone = profile['phone'] ?? '';
+          gender = profile['gender'] == 'MALE' ? '남' : '여';
+          age = profile['age'] ?? 0;
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          name = '불러오기 실패';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        name = '에러 발생';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<String> getAccessToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('accessToken');
+    if (token == null) throw Exception('accessToken이 없습니다.');
+    return token;
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return SingleChildScrollView(
       child: Column(
         children: [
@@ -26,6 +78,7 @@ class MyPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // 👤 사용자 정보
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -36,9 +89,15 @@ class MyPage extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            Text(name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, fontFamily: 'jua')),
+                            Text(
+                              name,
+                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, fontFamily: 'jua'),
+                            ),
                             const SizedBox(width: 8),
-                            Text('$age세 ($gender)', style: const TextStyle(fontSize: 16, color: Colors.grey, fontFamily: 'jua')),
+                            Text(
+                              '$age세 ($gender)',
+                              style: const TextStyle(fontSize: 16, color: Colors.grey, fontFamily: 'jua'),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 4),
@@ -47,7 +106,10 @@ class MyPage extends StatelessWidget {
                     ),
                   ],
                 ),
+
                 const SizedBox(height: 16),
+
+                // 💰 아낀 금액
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 14),
@@ -59,41 +121,64 @@ class MyPage extends StatelessWidget {
                     child: Text('아낀 금액 ‘ ------- 원 ’', style: TextStyle(fontSize: 16, fontFamily: 'jua')),
                   ),
                 ),
+
                 const SizedBox(height: 16),
+
+                // 🌟 평점
                 Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: const BoxDecoration(
                         color: Color(0xFFF6C651),
-                        borderRadius: BorderRadius.only(topLeft: Radius.circular(4), bottomLeft: Radius.circular(4)),
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(4),
+                          bottomLeft: Radius.circular(4),
+                        ),
                       ),
-                      child: const Text('평점', style: TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'jua')),
+                      child: const Text('평점',
+                          style: TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'jua')),
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
                       decoration: BoxDecoration(
                         border: Border.all(color: const Color(0xFFF6C651)),
-                        borderRadius: const BorderRadius.only(topRight: Radius.circular(4), bottomRight: Radius.circular(4)),
+                        borderRadius: const BorderRadius.only(
+                          topRight: Radius.circular(4),
+                          bottomRight: Radius.circular(4),
+                        ),
                       ),
-                      child: Text('#${rating.toStringAsFixed(1)}', style: const TextStyle(fontSize: 14, color: Color(0xFFF6C651), fontFamily: 'jua')),
+                      child: Text(
+                        '#${rating.toStringAsFixed(1)}',
+                        style: const TextStyle(fontSize: 14, color: Color(0xFFF6C651), fontFamily: 'jua'),
+                      ),
                     ),
                   ],
                 ),
+
                 const SizedBox(height: 12),
+
+                // 🏷️ 후기 키워드
                 Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: const BoxDecoration(
                         color: Color(0xFF1F355F),
-                        borderRadius: BorderRadius.only(topLeft: Radius.circular(4), bottomLeft: Radius.circular(4)),
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(4),
+                          bottomLeft: Radius.circular(4),
+                        ),
                       ),
-                      child: const Text('후기 키워드', style: TextStyle(fontSize: 13, color: Colors.white, fontFamily: 'jua')),
+                      child: const Text(
+                        '후기 키워드',
+                        style: TextStyle(fontSize: 13, color: Colors.white, fontFamily: 'jua'),
+                      ),
                     ),
                     ...tags.asMap().entries.map((entry) {
                       final index = entry.key;
                       final tag = entry.value;
+
                       return Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
@@ -104,7 +189,10 @@ class MyPage extends StatelessWidget {
                             bottomRight: Radius.circular(index == tags.length - 1 ? 4 : 0),
                           ),
                         ),
-                        child: Text('#$tag', style: const TextStyle(fontSize: 13, color: Color(0xFF1F355F), fontFamily: 'jua')),
+                        child: Text(
+                          '#$tag',
+                          style: const TextStyle(fontSize: 13, color: Color(0xFF1F355F), fontFamily: 'jua'),
+                        ),
                       );
                     }).toList(),
                   ],
