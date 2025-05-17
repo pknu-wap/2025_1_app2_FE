@@ -14,6 +14,16 @@ class AuthProvider extends ChangeNotifier {
   UserModel? get user => _user;
   AuthResponse? get tokens => _tokens;
 
+  int get userId {
+    if (_user == null) throw Exception('User not logged in');
+    return _user!.id!;
+  }
+
+  String get jwtToken {
+    if (_tokens == null) throw Exception('Token not available');
+    return _tokens!.jwt;
+  }
+
   /// 로그인 + 서버 인증
   Future<String> login() async {
     final u = await _authService.loginWithGoogle();

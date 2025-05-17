@@ -19,6 +19,9 @@ class AuthResponse {
       refreshToken: json['refreshToken'] as String,
     );
   }
+
+  /// Returns the JWT (accessToken).
+  String get jwt => accessToken;
 }
 
 class AuthService {
