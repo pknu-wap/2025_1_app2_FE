@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart'; // Firebase 추가 시 사용
+import 'firebase_options.dart';
 import 'package:app2_client/providers/auth_provider.dart';
 import 'package:app2_client/app.dart';
 
@@ -12,7 +13,9 @@ Future<void> main() async {
 
   if (Platform.isAndroid) {
     // Firebase 초기화 (Android에서만 실행)
-    await Firebase.initializeApp();
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
   }
 
   runApp(

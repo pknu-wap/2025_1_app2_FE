@@ -1,7 +1,17 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
-class ChatRoomScreen extends StatelessWidget {
+class ChatRoomScreen extends StatefulWidget {
   const ChatRoomScreen({super.key});
+
+  @override
+  State<ChatRoomScreen> createState() => _ChatRoomScreenState();
+}
+
+class _ChatRoomScreenState extends State<ChatRoomScreen> {
+  final TextEditingController _controller = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
 
   @override
   Widget build(BuildContext context) {
@@ -9,7 +19,7 @@ class ChatRoomScreen extends StatelessWidget {
       appBar: AppBar(
         leading: BackButton(),
         title: const Text(
-          '택시 모임 4',
+          '채팅방',
           style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
         ),
         actions: const [
@@ -42,11 +52,13 @@ class ChatRoomScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: const [
                 Text(
+                  // 임시 데이터
                   '부경대학교 정문 ➤ 서면 삼정타워',
                   style: TextStyle(fontSize: 14),
                 ),
                 SizedBox(height: 4),
                 Text(
+                  // 임시 데이터
                   '5월 23일 (금) 22:30 출발',
                   style: TextStyle(fontSize: 12, color: Colors.grey),
                 ),
@@ -54,14 +66,34 @@ class ChatRoomScreen extends StatelessWidget {
             ),
           ),
 
-          // 채팅 메시지 영역
+          // 채팅 메시지 영역 (Firestore 연동)
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              children: const [
-                ChatBubble(isMine: false, name: '이름', message: '채팅 내용'),
-                ChatBubble(isMine: true, name: '나', message: '채팅 내용'),
-              ],
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('chat_rooms')
+                  .doc('temp_room_id')
+                  .collection('messages')
+                  .orderBy('timestamp')
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return Center(child: CircularProgressIndicator());
+                }
+                final messages = snapshot.data!.docs;
+                return ListView(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  children: messages.map((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    return ChatBubble(
+                      isMine: data['sender'] == '나', // 사용자 이름 비교 필요
+                      name: data['sender'] ?? '',
+                      message: data['text'] ?? '',
+                      timestamp: data['timestamp'],
+                    );
+                  }).toList(),
+                );
+              },
             ),
           ),
 
@@ -73,6 +105,7 @@ class ChatRoomScreen extends StatelessWidget {
               children: [
                 Expanded(
                   child: TextField(
+                    controller: _controller,
                     decoration: InputDecoration(
                       hintText: '메시지를 입력하세요',
                       filled: true,
@@ -87,7 +120,30 @@ class ChatRoomScreen extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton(
-                  onPressed: () {},
+                  onPressed: () async {
+                    final text = _controller.text.trim();
+                    if (text.isNotEmpty) {
+                      await FirebaseFirestore.instance
+                          .collection('chat_rooms')
+                          .doc('temp_room_id')
+                          .collection('messages')
+                          .add({
+                        'text': text,
+                        'sender': '나', // 실제 로그인 사용자 정보로 대체
+                        'timestamp': FieldValue.serverTimestamp(),
+                      });
+                      _controller.clear();
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (_scrollController.hasClients) {
+                          _scrollController.animateTo(
+                            _scrollController.position.maxScrollExtent,
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeOut,
+                          );
+                        }
+                      });
+                    }
+                  },
                   style: ElevatedButton.styleFrom(
                     shape: const CircleBorder(),
                     padding: const EdgeInsets.all(12),
@@ -109,12 +165,14 @@ class ChatBubble extends StatelessWidget {
   final bool isMine;
   final String name;
   final String message;
+  final Timestamp? timestamp;
 
   const ChatBubble({
     super.key,
     required this.isMine,
     required this.name,
     required this.message,
+    required this.timestamp,
   });
 
   @override
@@ -124,6 +182,10 @@ class ChatBubble extends StatelessWidget {
     final margin = isMine
         ? const EdgeInsets.only(left: 80, top: 8, bottom: 8)
         : const EdgeInsets.only(right: 80, top: 8, bottom: 8);
+
+    final timeString = timestamp != null
+        ? DateFormat('a h:mm', 'ko').format(timestamp!.toDate())
+        : '';
 
     return Column(
       crossAxisAlignment: alignment,
@@ -139,7 +201,7 @@ class ChatBubble extends StatelessWidget {
           ),
           child: Text(message),
         ),
-        Text('오후 1:30', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+        Text(timeString, style: const TextStyle(fontSize: 10, color: Colors.grey)),
       ],
     );
   }
