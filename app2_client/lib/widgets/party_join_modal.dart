@@ -57,19 +57,9 @@ class PartyJoinModal extends StatelessWidget {
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: () async {
-                  final token = context.read<AuthProvider>().tokens?.accessToken;
-
-                  if (token == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('로그인이 필요합니다.')),
-                    );
-                    return;
-                  }
-
                   try {
                     await PartyService.attendParty(
                       partyId: pot.id,
-                      accessToken: token,
                     );
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(

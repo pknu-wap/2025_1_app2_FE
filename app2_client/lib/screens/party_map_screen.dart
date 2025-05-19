@@ -104,14 +104,10 @@ class _PartyMapScreenState extends State<PartyMapScreen> {
 
   /* ───────────────────────── 서버에서 파티 목록 ───────────────────────── */
   Future<void> _loadPots() async {
-    final token = context.read<AuthProvider>().tokens?.accessToken;
-    if (token == null) return;
-
     final list = await PartyService.fetchNearbyParties(
       lat: widget.initialLat,
       lng: widget.initialLng,
-      radiusKm: 50,
-      accessToken: token,
+      radiusKm: 50
     );
     setState(() => _pots = list);
     if (_pageLoaded) _renderMarkers();

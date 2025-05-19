@@ -32,14 +32,6 @@ class _PartyCreateModalState extends State<PartyCreateModal> {
   String _option = 'MIXED';
 
   Future<void> _submit() async {
-    final token = context.read<AuthProvider>().tokens?.accessToken;
-    if (token == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('로그인이 필요합니다')),
-      );
-      return;
-    }
-
     final req = PartyCreateRequest(
       partyStart: Location(
         address: widget.startAddress,
@@ -59,7 +51,6 @@ class _PartyCreateModalState extends State<PartyCreateModal> {
     try {
       final party = await PartyService.createParty(
         request: req,
-        accessToken: token,
       ); // 🎯 응답 받은 PartyDetail
 
       if (mounted) {

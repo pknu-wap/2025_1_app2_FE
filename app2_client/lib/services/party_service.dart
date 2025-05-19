@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:app2_client/services/dio_client.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
@@ -13,39 +14,31 @@ class PartyService {
     required double lat,
     required double lng,
     required double radiusKm,
-    required String accessToken,
   }) async {
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.partySearchEndpoint}');
-
     final body = jsonEncode({
       'lat': lat,
       'lng': lng,
       'radius': radiusKm,
     });
 
-    debugPrint('POST $uri');
     debugPrint('Request body: $body');
 
     try {
-      final response = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $accessToken',
-        },
-        body: body,
+      final response = await DioClient.dio.post(
+          ApiConstants.partySearchEndpoint,
+          data: body
       );
 
       debugPrint('Response status: ${response.statusCode}');
       debugPrint('Response body: '
-          '${response.body.length > 200 ? response.body.substring(0, 200) : response.body}');
+          '${response.data.length > 200 ? response.data.substring(0, 200) : response.data}');
 
       if (response.statusCode != 200) {
-        debugPrint('PartyService error ${response.statusCode}, body: ${response.body}');
+        debugPrint('PartyService error ${response.statusCode}, body: ${response.data}');
         return [];
       }
 
-      final List<dynamic> jsonList = jsonDecode(response.body) as List<dynamic>;
+      final List<dynamic> jsonList = response.data as List<dynamic>;
       if (jsonList.isEmpty) {
         debugPrint('ℹ️ 반경 내 파티가 없습니다.');
       }
@@ -60,32 +53,24 @@ class PartyService {
 
   /// ✅ 파티 생성 (응답을 PartyDetail로 반환)
   static Future<PartyDetail> createParty({
-    required PartyCreateRequest request,
-    required String accessToken,
+    required PartyCreateRequest request
   }) async {
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.partyEndpoint}');
     final body = jsonEncode(request.toJson());
 
-    debugPrint('POST $uri');
     debugPrint('Request body: $body');
 
     try {
-      final response = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $accessToken',
-        },
-        body: body,
+      final response = await DioClient.dio.post(
+        ApiConstants.partyEndpoint,
+        data: body
       );
 
       if (response.statusCode != 200) {
-        throw Exception('파티 생성 실패: ${response.statusCode}, ${response.body}');
+        throw Exception('파티 생성 실패: ${response.statusCode}, ${response.data}');
       }
 
-      debugPrint('✅ 파티 생성 성공: ${response.body}');
-      final json = jsonDecode(response.body);
-      return PartyDetail.fromJson(json); // ✅ 응답을 모델로 변환하여 리턴
+      debugPrint('✅ 파티 생성 성공: ${response.data}');
+      return PartyDetail.fromJson(response.data);
     } catch (e) {
       debugPrint('❌ 파티 생성 중 에러: $e');
       rethrow;
@@ -94,42 +79,28 @@ class PartyService {
 
   /// 파티 참여
   static Future<void> attendParty({
-    required String partyId,
-    required String accessToken,
+    required String partyId
   }) async {
-    final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.partyEndpoint}/$partyId/attend');
-
-    final response = await http.post(
-      uri,
-      headers: {
-        'Authorization': 'Bearer $accessToken',
-        'Content-Type': 'application/json',
-      },
+    final response = await DioClient.dio.post(
+      "{ApiConstants.partyEndpoint}/$partyId/attend"
     );
 
     if (response.statusCode != 200) {
-      throw Exception('파티 참여 실패: ${response.body}');
+      throw Exception('파티 참여 실패: ${response.data}');
     }
   }
 
   /// 내가 만든 파티 조회 (백엔드에서 API 준비된 경우)
-  static Future<PartyDetail?> getMyParty(String accessToken) async {
-    final uri = Uri.parse('${ApiConstants.baseUrl}/api/party/my');
-
+  static Future<PartyDetail?> getMyParty() async {
     try {
-      final res = await http.get(
-        uri,
-        headers: {
-          'Authorization': 'Bearer $accessToken',
-          'Content-Type': 'application/json',
-        },
+      final response = await DioClient.dio.post(
+        '${ApiConstants.baseUrl}/api/party/my'
       );
 
-      if (res.statusCode == 200) {
-        final json = jsonDecode(res.body);
-        return PartyDetail.fromJson(json);
+      if (response.statusCode == 200) {
+        return PartyDetail.fromJson(response.data);
       } else {
-        debugPrint('❌ getMyParty 실패: ${res.statusCode}');
+        debugPrint('❌ getMyParty 실패: ${response.statusCode}');
         return null;
       }
     } catch (e) {
