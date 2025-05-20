@@ -1,10 +1,11 @@
 import 'package:app2_client/constants/api_constants.dart';
+import 'package:app2_client/services/auth_service.dart';
 import 'package:dio/dio.dart';
 import '../services/secure_storage_service.dart';
 
 class TokenInterceptor extends Interceptor {
   final SecureStorageService _storage = SecureStorageService();
-  final Dio _refreshDio = Dio(); // 순환 방지용 별도 인스턴스
+  final Dio _refreshDio = Dio(); // 순환 방지용
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
@@ -20,31 +21,22 @@ class TokenInterceptor extends Interceptor {
     final res = err.response;
     final data = res?.data;
 
-    // 403 & access token 만료
-    if (res != null && res.statusCode == 403 && data is Map<String, dynamic>) {
+    // 403 & access token 만료만 처리
+    if (res?.statusCode == 403) {
       final code = data['code'];
-
-      if (code != "TOKEN-403-2") {
+      if (code != "TOKEN-403-1") {
         return handler.next(err);
       }
 
+      final refreshToken = await _storage.getRefreshToken();
+
       try {
-        final refreshToken = await _storage.getRefreshToken();
-        // 토큰 재발급 요청
         final refreshResp = await _refreshDio.post(
           '${ApiConstants.baseUrl}${ApiConstants.reissueEndPoint}',
           data: {'refreshToken': refreshToken},
         );
 
-        if (refreshResp.statusCode == 403 &&
-            refreshResp.data is Map<String, dynamic> &&
-            refreshResp.data['code'] == "TOKEN-403-3") {
-          //리프레시 토큰도 만료
-          await _storage.deleteTokens();
-          return handler.reject(err);
-        }
-
-        // 새 토큰 저장
+        // 토큰 저장
         final newAccessToken = refreshResp.data['accessToken'];
         final newRefreshToken = refreshResp.data['refreshToken'];
         await _storage.saveTokens(
@@ -52,15 +44,25 @@ class TokenInterceptor extends Interceptor {
           refreshToken: newRefreshToken,
         );
 
-        // 원래 요청에 새 토큰으로 재시도
+        // 원래 요청 새 토큰으로 재시도
         final opts = err.requestOptions;
         opts.headers['Authorization'] = 'Bearer $newAccessToken';
 
         final retryResp = await Dio().fetch(opts);
         return handler.resolve(retryResp);
+
+      } on DioException catch (e) {
+        // 리프레시 토큰 만료
+        final status = e.response?.statusCode;
+        if (status == 403) {
+          print("리프레시 토큰 만료 또는 유효하지 않음");
+          AuthService().logout();
+          return handler.reject(err);
+        }
+        print('전송 오류: $e');
+        return handler.reject(err);
       } catch (e) {
-        //재발행 중 오류
-        await _storage.deleteTokens();
+        print('전송 오류: $e');
         return handler.reject(err);
       }
     }

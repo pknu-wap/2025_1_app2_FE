@@ -1,5 +1,8 @@
 import 'dart:convert';
+import 'package:app2_client/main.dart';
+import 'package:app2_client/screens/login_screen.dart';
 import 'package:app2_client/services/secure_storage_service.dart';
+import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:dio/dio.dart';
 import 'package:app2_client/models/user_model.dart';
@@ -8,13 +11,15 @@ import '/services/dio_client.dart';
 
 /// 백엔드가 반환해 주는 토큰 쌍
 class AuthResponse {
+  final int? statusCode;
   final String accessToken;
   final String refreshToken;
 
-  AuthResponse({required this.accessToken, required this.refreshToken});
+  AuthResponse({this.statusCode, required this.accessToken, required this.refreshToken});
 
-  factory AuthResponse.fromJson(Map<String, dynamic> json) {
+  factory AuthResponse.fromJson(int? statusCode, Map<String, dynamic> json) {
     return AuthResponse(
+      statusCode: statusCode,
       accessToken: json['accessToken'] as String,
       refreshToken: json['refreshToken'] as String,
     );
@@ -25,6 +30,17 @@ class AuthService {
   final SecureStorageService _storage = SecureStorageService();
   GoogleSignInAccount? _lastUser;
   GoogleSignInAccount? get lastGoogleUser => _lastUser;
+
+  Future<void> logout() async {;
+    await _storage.deleteTokens();
+    GoogleSignIn().signOut();
+
+    // 로그인 화면으로 이동
+    navigatorKey.currentState?.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => LoginScreen()),
+          (route) => false,
+    );
+  }
 
   Future<UserModel?> loginWithGoogle() async {
     try {
@@ -86,7 +102,7 @@ class AuthService {
         },
       );
       if (res.statusCode == 200) {
-        final authResp = AuthResponse.fromJson(res.data);
+        final authResp = AuthResponse.fromJson(res.statusCode, res.data);
         _storage.saveTokens(accessToken: authResp.accessToken, refreshToken: authResp.refreshToken);
         print('✅ Server Login Success');
         print('   ▶ accessToken:  ${authResp.accessToken}');
@@ -97,6 +113,14 @@ class AuthService {
       return null;
     } on DioException catch (e) {
       print('🔴 login failed (DioError): ${e.response?.statusCode} ${e.response?.data}');
+      if (e.response?.statusCode == 404) {
+        //회원 존재 X
+        return AuthResponse(
+          statusCode: e.response?.statusCode,
+          accessToken: "",
+          refreshToken: "",
+        );
+      }
       return null;
     } catch (e) {
       print('🔴 login failed: $e');
@@ -129,7 +153,7 @@ class AuthService {
         data: body,
       );
       if (res.statusCode == 200) {
-        final authResp = AuthResponse.fromJson(res.data);
+        final authResp = AuthResponse.fromJson(res.statusCode, res.data);
         _storage.saveTokens(accessToken: authResp.accessToken, refreshToken: authResp.refreshToken);
         print('✅ Server Register Success');
         print('   ▶ accessToken:  ${authResp.accessToken}');
@@ -140,6 +164,14 @@ class AuthService {
       return null;
     } on DioException catch (e) {
       print('🔴 register failed (DioError): ${e.response?.statusCode} ${e.response?.data}');
+      if (e.response?.statusCode == 404) {
+        //회원 존재 X
+        return AuthResponse(
+          statusCode: e.response?.statusCode,
+          accessToken: "",
+          refreshToken: "",
+        );
+      }
       return null;
     } catch (e) {
       print('🔴 register failed: $e');

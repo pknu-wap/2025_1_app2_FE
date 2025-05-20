@@ -1,3 +1,5 @@
+import 'package:app2_client/main.dart';
+import 'package:app2_client/screens/root_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'screens/login_screen.dart';
@@ -13,6 +15,7 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         title: '같이타요',
         debugShowCheckedModeBanner: false,
+        navigatorKey: navigatorKey,
         theme: ThemeData(
           fontFamily: 'Pretendard',
           colorScheme: ColorScheme.fromSeed(seedColor: Color(0xFF003366)),
@@ -23,7 +26,7 @@ class MyApp extends StatelessWidget {
           ),
           useMaterial3: true,
         ),
-        home: LoginScreen(),
+        home: RootScreen(),
       ),
     );
   }
