@@ -1,7 +1,7 @@
 // lib/providers/auth_provider.dart
-import 'package:flutter/foundation.dart';
-import 'package:app2_client/services/auth_service.dart';
 import 'package:app2_client/models/user_model.dart';
+import 'package:app2_client/services/auth_service.dart';
+import 'package:flutter/material.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService;
@@ -15,6 +15,7 @@ class AuthProvider extends ChangeNotifier {
   AuthResponse? get tokens => _tokens;
 
   /// 로그인 + 서버 인증
+  /// @deprecated 예정
   Future<String> login() async {
     final u = await _authService.loginWithGoogle();
     if (u == null) return 'GOOGLE_SIGN_IN_FAILED';
@@ -26,16 +27,19 @@ class AuthProvider extends ChangeNotifier {
       accessToken: u.accessToken,
     );
 
-    if (resp != null) {
+    if (resp != null && resp.statusCode == 200) {
       _tokens = resp;
       notifyListeners();
       return 'SUCCESS';
+    } else if (resp?.statusCode == 404) {
+      return "MEMBER_NOT_FOUND";
     }
 
-    return 'MEMBER_NOT_FOUND';
+    return 'ERROR';
   }
 
   /// 회원가입 완료
+  /// @deprecated 예정
   Future<bool> completeSignup({
     required String name,
     required String phone,
@@ -55,7 +59,7 @@ class AuthProvider extends ChangeNotifier {
       profileImageUrl: profileImageUrl,
     );
 
-    if (resp != null) {
+    if (resp != null && resp.statusCode == 200) {
       _tokens = resp;
       notifyListeners();
       return true;
