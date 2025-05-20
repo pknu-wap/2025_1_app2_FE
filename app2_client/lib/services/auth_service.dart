@@ -1,20 +1,25 @@
-// lib/services/auth_service.dart
-
 import 'dart:convert';
+import 'package:app2_client/main.dart';
+import 'package:app2_client/screens/login_screen.dart';
+import 'package:app2_client/services/secure_storage_service.dart';
+import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 import 'package:app2_client/models/user_model.dart';
 import 'package:app2_client/constants/api_constants.dart';
+import '/services/dio_client.dart';
 
 /// 백엔드가 반환해 주는 토큰 쌍
 class AuthResponse {
+  final int? statusCode;
   final String accessToken;
   final String refreshToken;
 
-  AuthResponse({required this.accessToken, required this.refreshToken});
+  AuthResponse({this.statusCode, required this.accessToken, required this.refreshToken});
 
-  factory AuthResponse.fromJson(Map<String, dynamic> json) {
+  factory AuthResponse.fromJson(int? statusCode, Map<String, dynamic> json) {
     return AuthResponse(
+      statusCode: statusCode,
       accessToken: json['accessToken'] as String,
       refreshToken: json['refreshToken'] as String,
     );
@@ -22,8 +27,20 @@ class AuthResponse {
 }
 
 class AuthService {
+  final SecureStorageService _storage = SecureStorageService();
   GoogleSignInAccount? _lastUser;
   GoogleSignInAccount? get lastGoogleUser => _lastUser;
+
+  Future<void> logout() async {;
+    await _storage.deleteTokens();
+    GoogleSignIn().signOut();
+
+    // 로그인 화면으로 이동
+    navigatorKey.currentState?.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => LoginScreen()),
+          (route) => false,
+    );
+  }
 
   Future<UserModel?> loginWithGoogle() async {
     try {
@@ -57,7 +74,6 @@ class AuthService {
         print('⚠️ Invalid ID Token format');
         return;
       }
-
       final payload = base64Url.normalize(parts[1]);
       final decoded = utf8.decode(base64Url.decode(payload));
       final Map<String, dynamic> jsonPayload = jsonDecode(decoded);
@@ -77,25 +93,39 @@ class AuthService {
     required String idToken,
     required String accessToken,
   }) async {
-    final url = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.loginEndpoint}');
-    final resp = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'idToken': idToken,
-        'accessToken': accessToken,
-      }),
-    );
-    if (resp.statusCode == 200) {
-      final authResp = AuthResponse.fromJson(jsonDecode(resp.body));
-      // 서버가 준 토큰을 찍어 봅니다.
-      print('✅ Server Login Success');
-      print('   ▶ accessToken:  ${authResp.accessToken}');
-      print('   ▶ refreshToken: ${authResp.refreshToken}');
-      return authResp;
+    try {
+      final res = await DioClient.dio.post(
+        ApiConstants.loginEndpoint,
+        data: {
+          'idToken': idToken,
+          'accessToken': accessToken,
+        },
+      );
+      if (res.statusCode == 200) {
+        final authResp = AuthResponse.fromJson(res.statusCode, res.data);
+        _storage.saveTokens(accessToken: authResp.accessToken, refreshToken: authResp.refreshToken);
+        print('✅ Server Login Success');
+        print('   ▶ accessToken:  ${authResp.accessToken}');
+        print('   ▶ refreshToken: ${authResp.refreshToken}');
+        return authResp;
+      }
+      print('🔴 login failed (${res.statusCode}): ${res.data}');
+      return null;
+    } on DioException catch (e) {
+      print('🔴 login failed (DioError): ${e.response?.statusCode} ${e.response?.data}');
+      if (e.response?.statusCode == 404) {
+        //회원 존재 X
+        return AuthResponse(
+          statusCode: e.response?.statusCode,
+          accessToken: "",
+          refreshToken: "",
+        );
+      }
+      return null;
+    } catch (e) {
+      print('🔴 login failed: $e');
+      return null;
     }
-    print('🔴 login failed (${resp.statusCode}): ${resp.body}');
-    return null;
   }
 
   /// 백엔드 회원가입 호출 (/api/oauth/register)
@@ -108,30 +138,44 @@ class AuthService {
     required String gender,
     String? profileImageUrl,
   }) async {
-    final url = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.signupEndpoint}');
-    final body = {
-      'idToken': idToken,
-      'accessToken': accessToken,
-      'name': name,
-      'phone': phone,
-      'age': age,
-      'gender': gender,
-      if (profileImageUrl != null) 'profileImageUrl': profileImageUrl,
-    };
-    final resp = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(body),
-    );
-    if (resp.statusCode == 200) {
-      final authResp = AuthResponse.fromJson(jsonDecode(resp.body));
-      // 회원가입 성공 시 토큰도 로그에 찍어 봅니다.
-      print('✅ Server Register Success');
-      print('   ▶ accessToken:  ${authResp.accessToken}');
-      print('   ▶ refreshToken: ${authResp.refreshToken}');
-      return authResp;
+    try {
+      final body = {
+        'idToken': idToken,
+        'accessToken': accessToken,
+        'name': name,
+        'phone': phone,
+        'age': age,
+        'gender': gender,
+        if (profileImageUrl != null) 'profileImageUrl': profileImageUrl,
+      };
+      final res = await DioClient.dio.post(
+        ApiConstants.signupEndpoint,
+        data: body,
+      );
+      if (res.statusCode == 200) {
+        final authResp = AuthResponse.fromJson(res.statusCode, res.data);
+        _storage.saveTokens(accessToken: authResp.accessToken, refreshToken: authResp.refreshToken);
+        print('✅ Server Register Success');
+        print('   ▶ accessToken:  ${authResp.accessToken}');
+        print('   ▶ refreshToken: ${authResp.refreshToken}');
+        return authResp;
+      }
+      print('🔴 register failed (${res.statusCode}): ${res.data}');
+      return null;
+    } on DioException catch (e) {
+      print('🔴 register failed (DioError): ${e.response?.statusCode} ${e.response?.data}');
+      if (e.response?.statusCode == 404) {
+        //회원 존재 X
+        return AuthResponse(
+          statusCode: e.response?.statusCode,
+          accessToken: "",
+          refreshToken: "",
+        );
+      }
+      return null;
+    } catch (e) {
+      print('🔴 register failed: $e');
+      return null;
     }
-    print('🔴 register failed (${resp.statusCode}): ${resp.body}');
-    return null;
   }
 }

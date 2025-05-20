@@ -6,6 +6,8 @@ import 'package:firebase_core/firebase_core.dart'; // Firebase 추가 시 사용
 import 'package:app2_client/providers/auth_provider.dart';
 import 'package:app2_client/app.dart';
 
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env');
