@@ -1,8 +1,8 @@
+import 'package:app2_client/providers/auth_provider.dart';
+import 'package:app2_client/screens/destination_select_screen.dart';
+import 'package:app2_client/screens/sms_certification_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:app2_client/providers/auth_provider.dart';
-import 'package:app2_client/screens/signup_screen.dart';
-import 'package:app2_client/screens/destination_select_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sign_in_button/sign_in_button.dart';
 
@@ -61,10 +61,10 @@ class LoginScreen extends StatelessWidget {
                       );
                     } else if (result == 'MEMBER_NOT_FOUND') {
                       final u = auth.user!;
-                      Navigator.pushReplacement(
+                      Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => SignupScreen(
+                          builder: (_) => SmsCertificationScreen(
                             idToken: u.idToken,
                             accessToken: u.accessToken,
                             name: u.name,

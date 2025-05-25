@@ -1,7 +1,7 @@
 import 'package:app2_client/screens/destination_select_screen.dart';
 import 'package:app2_client/screens/login_screen.dart';
-import 'package:flutter/material.dart';
 import 'package:app2_client/services/secure_storage_service.dart';
+import 'package:flutter/material.dart';
 
 class RootScreen extends StatelessWidget {
   const RootScreen({super.key});

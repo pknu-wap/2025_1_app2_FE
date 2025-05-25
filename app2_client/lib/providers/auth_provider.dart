@@ -50,6 +50,7 @@ class AuthProvider extends ChangeNotifier {
     if (_user == null) return false;
 
     final resp = await _authService.registerOnServer(
+      session: '',
       idToken: _user!.idToken,
       accessToken: _user!.accessToken,
       name: name,

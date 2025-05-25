@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:app2_client/main.dart';
+import 'package:app2_client/models/sms_session_model.dart';
+import 'package:app2_client/models/sms_verify_model.dart';
 import 'package:app2_client/screens/login_screen.dart';
 import 'package:app2_client/services/secure_storage_service.dart';
 import 'package:flutter/material.dart';
@@ -130,6 +132,7 @@ class AuthService {
 
   /// 백엔드 회원가입 호출 (/api/oauth/register)
   Future<AuthResponse?> registerOnServer({
+    required String session,
     required String idToken,
     required String accessToken,
     required String name,
@@ -140,6 +143,7 @@ class AuthService {
   }) async {
     try {
       final body = {
+        'key': session,
         'idToken': idToken,
         'accessToken': accessToken,
         'name': name,
@@ -175,6 +179,37 @@ class AuthService {
       return null;
     } catch (e) {
       print('🔴 register failed: $e');
+      return null;
+    }
+  }
+
+  Future<SmsSessionModel?> getSessionKey() async {
+    try {
+      final res = await DioClient.dio.get(
+          ApiConstants.getSmsKeyEndPoint
+      );
+      Map<String, dynamic> json = res.data;
+      return SmsSessionModel(sendTo: json["email"], key: json["key"]);
+    } catch (e) {
+      print(e.toString());
+      return null;
+    }
+  }
+
+  Future<SmsVerifyModel?> verifySms(String key) async {
+    try {
+      final res = await DioClient.dio.post(
+        ApiConstants.verifySmsKeyEndPoint,
+        data: {
+          "key": key
+        }
+      );
+      Map<String, dynamic> json = res.data;
+      return SmsVerifyModel(phoneNumber: json["phoneNumber"], carrier: json["carrier"]);
+    } on DioException catch (e) {
+      print(e.toString());
+      return null;
+    } catch (e) {
       return null;
     }
   }
