@@ -54,6 +54,11 @@ dependencies:
   dio: ^5.8.0+1
 
   shared_preferences: ^2.2.2
+  url_launcher: ^6.3.1
+  flutter_sms:
+    git:
+      url: https://github.com/lepitaaar/flutter_sms.git
+      ref: master
 
 
 dev_dependencies:

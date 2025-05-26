@@ -1,8 +1,9 @@
 import 'package:app2_client/main.dart';
+import 'package:app2_client/screens/login_screen.dart';
 import 'package:app2_client/screens/root_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'screens/login_screen.dart';
+
 import 'providers/auth_provider.dart';
 
 class MyApp extends StatelessWidget {
@@ -26,7 +27,7 @@ class MyApp extends StatelessWidget {
           ),
           useMaterial3: true,
         ),
-        home: RootScreen(),
+        home: LoginScreen(),
       ),
     );
   }
