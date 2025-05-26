@@ -22,6 +22,28 @@ class SmsCertificationScreen extends StatefulWidget {
 
 class _SmsCertificationScreenState extends State<SmsCertificationScreen> with WidgetsBindingObserver {
   final AuthService _authService = AuthService();
+  bool isVerifying = false;
+  SmsSessionModel? _session = null;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) async {
+    // 앱이 포그라운드로 돌아왔을 때
+    if (state == AppLifecycleState.resumed) {
+      verifySms();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -67,45 +89,8 @@ class _SmsCertificationScreenState extends State<SmsCertificationScreen> with Wi
               height: 54,
               child: ElevatedButton(
                 onPressed: () async {
-                  SmsSessionModel? session = await _authService.getSessionKey();
-                  //적절한 에러처리
-                  if (session == null) return;
-
-                  final String sendTo = session.sendTo; // ex: "@gmail.com"
-                  final String smsBody = session.key; // ex: "인증용 키"
-
-                  String result = await sendSMS(message: smsBody, recipients: [sendTo], sendDirect: false);
-                  if (result != 'sent') return;
-                  if (!mounted) return;
-                  
-                  showLoadingDialog(context);
-
-                  await Future.delayed(const Duration(milliseconds: 7000)); // 7초 대기.. 너무 느림
-                  SmsVerifyModel? model = await _authService.verifySms(session.key);
-                  if (!mounted) return;
-
-                  hideLoadingDialog(context);
-
-                  if (model == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('인증에 실패했습니다. 다시 시도해 주세요.')),
-                    );
-                    return;
-                  }
-
-                  Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(
-                        builder: (context) => SignupScreen(
-                          session: session.key,
-                          idToken: widget.idToken,
-                          accessToken: widget.accessToken,
-                          name: widget.name,
-                          email: widget.email,
-                          phone: model!.phoneNumber,
-                        ),
-                      ),
-                      (Route<dynamic> route) => false,
-                  );
+                  await showSms();
+                  await verifySms();
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF20C4F8),
@@ -126,6 +111,63 @@ class _SmsCertificationScreenState extends State<SmsCertificationScreen> with Wi
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> showSms() async {
+    _session = await _authService.getSessionKey();
+    if (_session == null) return;
+
+    final String sendTo = _session!.sendTo; // ex: "@gmail.com"
+    final String smsBody = _session!.key; // ex: "인증용 키"
+
+    isVerifying = true;
+    String result = await sendSMS(message: smsBody, recipients: [sendTo], sendDirect: false)
+        .catchError((error) {
+          if (!mounted) return '';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('SMS 전송을 지원하지 않는 단말기입니다.')),
+      );
+      isVerifying = false;
+      print(error);
+      return '';
+    });
+    if (result != 'sent') {
+      isVerifying = false;
+      return;
+    }
+  }
+
+  Future<void> verifySms() async {
+    if (!isVerifying || !mounted || _session == null) return;
+
+    showLoadingDialog(context);
+
+    await Future.delayed(const Duration(milliseconds: 7000)); // 7초 대기.. 너무 느림
+    SmsVerifyModel? model = await _authService.verifySms(_session!.key);
+    if (!mounted) return;
+
+    hideLoadingDialog(context);
+
+    if (model == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('인증에 실패했습니다. 다시 시도해 주세요.')),
+      );
+      return;
+    }
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (context) => SignupScreen(
+          session: _session!.key,
+          idToken: widget.idToken,
+          accessToken: widget.accessToken,
+          name: widget.name,
+          email: widget.email,
+          phone: model.phoneNumber,
+        ),
+      ),
+          (Route<dynamic> route) => false,
     );
   }
 
