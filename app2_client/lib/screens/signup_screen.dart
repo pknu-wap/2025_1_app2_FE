@@ -44,6 +44,8 @@ class _SignupScreenState extends State<SignupScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('accessToken', widget.accessToken);
 
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('회원가입 완료!')),
       );

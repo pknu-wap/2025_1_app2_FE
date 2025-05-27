@@ -143,7 +143,7 @@ class _SmsCertificationScreenState extends State<SmsCertificationScreen> with Wi
 
     showLoadingDialog(context);
 
-    await Future.delayed(const Duration(milliseconds: 7000)); // 7초 대기.. 너무 느림
+    await Future.delayed(const Duration(milliseconds: 8000)); // 7초 대기.. 너무 느림
     SmsVerifyModel? model = await _authService.verifySms(_session!.key);
     if (!mounted) return;
 
