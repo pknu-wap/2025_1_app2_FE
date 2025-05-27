@@ -148,6 +148,7 @@ class _SmsCertificationScreenState extends State<SmsCertificationScreen> with Wi
     if (!mounted) return;
 
     hideLoadingDialog(context);
+    isVerifying = false;
 
     if (model == null) {
       ScaffoldMessenger.of(context).showSnackBar(
