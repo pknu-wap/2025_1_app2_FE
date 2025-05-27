@@ -105,7 +105,7 @@ class AuthService {
       );
       if (res.statusCode == 200) {
         final authResp = AuthResponse.fromJson(res.statusCode, res.data);
-        _storage.saveTokens(accessToken: authResp.accessToken, refreshToken: authResp.refreshToken);
+        await _storage.saveTokens(accessToken: authResp.accessToken, refreshToken: authResp.refreshToken);
         print('✅ Server Login Success');
         print('   ▶ accessToken:  ${authResp.accessToken}');
         print('   ▶ refreshToken: ${authResp.refreshToken}');
@@ -158,7 +158,7 @@ class AuthService {
       );
       if (res.statusCode == 200) {
         final authResp = AuthResponse.fromJson(res.statusCode, res.data);
-        _storage.saveTokens(accessToken: authResp.accessToken, refreshToken: authResp.refreshToken);
+        await _storage.saveTokens(accessToken: authResp.accessToken, refreshToken: authResp.refreshToken);
         print('✅ Server Register Success');
         print('   ▶ accessToken:  ${authResp.accessToken}');
         print('   ▶ refreshToken: ${authResp.refreshToken}');

@@ -27,8 +27,7 @@ class _MyPageState extends State<MyPage> {
 
   Future<void> fetchProfile() async {
     try {
-      final accessToken = await getAccessToken();
-      final profile = await ProfileService().getProfile(accessToken);
+      final profile = await ProfileService.getProfile();
 
       if (profile != null) {
         setState(() {
@@ -50,13 +49,6 @@ class _MyPageState extends State<MyPage> {
         _isLoading = false;
       });
     }
-  }
-
-  Future<String> getAccessToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('accessToken');
-    if (token == null) throw Exception('accessToken이 없습니다.');
-    return token;
   }
 
   @override
