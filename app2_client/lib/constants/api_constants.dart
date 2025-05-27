@@ -10,6 +10,8 @@ class ApiConstants {
   static const String kakaoSearchUrl =
       'https://dapi.kakao.com/v2/local/search/address.json';
 
+  static const String getProfileEndpoint = '/api/profile';
+
   static const String loginEndpoint = '/api/oauth/login';
   static const String signupEndpoint = '/api/oauth/register';
   static const String reissueEndPoint = '/api/oauth/reissue';
