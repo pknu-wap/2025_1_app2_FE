@@ -1,27 +1,16 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:app2_client/constants/api_constants.dart';
+import 'package:app2_client/services/dio_client.dart';
 
 class ProfileService {
-  // .env에 정의된 BACKEND_BASE_URL 값을 읽음
-  final String baseUrl = dotenv.env['BACKEND_BASE_URL']!;
-
-  // accessToken을 이용해 프로필 정보를 요청
-  Future<Map<String, dynamic>?> getProfile(String accessToken) async {
-    final uri = Uri.parse('$baseUrl/api/profile');
-
+  // 프로필 정보를 요청
+  static Future<Map<String, dynamic>?> getProfile() async {
     try {
-      final response = await http.get(
-        uri,
-        headers: {
-          'Authorization': 'Bearer $accessToken',
-        },
-      );
+      final response = await DioClient.dio.get(ApiConstants.getProfileEndpoint);
 
       if (response.statusCode == 200) {
-        return jsonDecode(utf8.decode(response.bodyBytes));
+        return response.data;
       } else {
-        print('🔴 프로필 요청 실패: ${response.statusCode} ${response.body}');
+        print('🔴 프로필 요청 실패: ${response.statusCode} ${response.data}');
         return null;
       }
     } catch (e) {
