@@ -22,7 +22,7 @@ class TokenInterceptor extends Interceptor {
     final data = res?.data;
 
     // 403 & access token 만료만 처리
-    if (res?.statusCode == 403) {
+    if (res?.statusCode == 403 && res?.data != null && data != "") {
       final code = data['code'];
       if (code != "TOKEN-403-1") {
         return handler.next(err);

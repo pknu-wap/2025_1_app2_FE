@@ -50,8 +50,8 @@ class PartyCreateRequest {
         partyDestination = Stopover(location: partyDestination, stopoverType: 'DESTINATION');
 
   Map<String, dynamic> toJson() => {
-    'party_start': partyStart.toJson(),
-    'party_destination': partyDestination.toJson(),
+    'party_start': partyStart.location.toJson(),
+    'party_destination': partyDestination.location.toJson(),
     'party_radius': partyRadius,
     'party_max_person': partyMaxPerson,
     'party_option': partyOption,
