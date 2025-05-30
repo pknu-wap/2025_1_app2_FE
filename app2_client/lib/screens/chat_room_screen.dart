@@ -5,7 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:app2_client/screens/report_page.dart';
+import 'package:app2_client/screens/report_screen.dart';
 
 class ChatRoomScreen extends StatefulWidget {
   final String roomId;
@@ -351,7 +351,7 @@ class _ChatBubbleState extends State<ChatBubble> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => ReportPage(
+                        builder: (context) => ReportScreen(
                           reportedUserName: widget.name,
                           messageContent: widget.message,
                           messageTimestamp: widget.timestamp?.toDate(),
