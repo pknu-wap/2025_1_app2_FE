@@ -86,6 +86,7 @@ class PartyService {
       throw Exception('파티 참여 실패: ${response.data}');
     }
   }
+
   /// 파티 참여 수락
   static Future<void> acceptJoinRequest({
     required String partyId,
@@ -123,6 +124,26 @@ class PartyService {
       throw Exception('참여 거절 실패: ${response.data}');
     }
   }
+
+  /// 파티 참여 요청 취소
+  static Future<void> cancelJoinRequest({
+    required String partyId,
+    required int requestId,
+    required String accessToken,
+  }) async {
+    final url = "${ApiConstants.partyEndpoint}/$partyId/attend/cancel";
+    final response = await DioClient.dio.post(
+      url,
+      data: {'request_id': requestId},
+      options: Options(
+        headers: {'Authorization': 'Bearer $accessToken'},
+      ),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('참여 요청 취소 실패: ${response.data}');
+    }
+  }
+
   /// 내가 만든 파티 조회 (POST 방식, 실제 서버 명세에 따라 GET/POST 확인 필요)
   static Future<PartyDetail?> getMyParty() async {
     try {
@@ -141,6 +162,7 @@ class PartyService {
       return null;
     }
   }
+
   /// 파티 상세정보(id로 조회)
   static Future<PartyDetail> fetchPartyDetailById(String partyId) async {
     final url = "${ApiConstants.partyEndpoint}/$partyId";

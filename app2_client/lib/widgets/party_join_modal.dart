@@ -21,6 +21,10 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
   bool _loading = false;
   bool _subscribed = false;
 
+  // 참여 요청 ID와 상태 관리
+  int? _pendingRequestId;
+  String _joinStatus = 'IDLE'; // 'IDLE', 'WAIT', 'PENDING', 'APPROVED', 'REJECTED', 'CANCELED'
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -37,7 +41,6 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
       return;
     }
 
-    // 구독은 한 번만!
     if (!_subscribed) {
       SocketService.connect(_accessToken!);
       final topic = '/sub/party/${widget.pot.id}/result';
@@ -51,12 +54,16 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
 
   Future<void> _handleSocketMessage(Map<String, dynamic> message) async {
     final status = message['status'];
-    if (status == 'APPROVED' || status == 'ACCEPTED') {
+    final reqId = message['requestId']; // 서버 명세에 따라 'requestId' 또는 'request_id'
+
+    if (status == 'PENDING' && reqId != null) {
+      setState(() {
+        _pendingRequestId = reqId is int ? reqId : int.tryParse(reqId.toString());
+        _joinStatus = 'PENDING';
+      });
+    } else if (status == 'APPROVED' || status == 'ACCEPTED') {
       Navigator.pop(context);
-
       setState(() => _loading = true);
-
-      // 상세정보는 AttendeePartyScreen에서 직접 fetch하도록 partyId만 전달!
       if (!mounted) return;
       Navigator.push(
         context,
@@ -64,13 +71,62 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
           builder: (_) => AttendeePartyScreen(partyId: widget.pot.id),
         ),
       );
-
       if (mounted) setState(() => _loading = false);
     } else if (status == 'REJECTED') {
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('참여가 거절되었습니다')),
       );
+    } else if (status == 'CANCELED') {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('참여 요청이 취소되었습니다')),
+      );
+    }
+  }
+
+  Future<void> _joinParty() async {
+    try {
+      setState(() {
+        _loading = true;
+        _joinStatus = 'WAIT';
+      });
+      await PartyService.attendParty(
+        partyId: widget.pot.id,
+        accessToken: _accessToken!,
+      );
+      // 수락/거절/취소는 소켓에서!
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('참가 실패: $e')),
+      );
+      setState(() => _joinStatus = 'IDLE');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _cancelJoinRequest() async {
+    if (_pendingRequestId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('요청ID를 확인할 수 없습니다.')),
+      );
+      return;
+    }
+    try {
+      setState(() => _loading = true);
+      await PartyService.cancelJoinRequest(
+        partyId: widget.pot.id,
+        requestId: _pendingRequestId!,
+        accessToken: _accessToken!,
+      );
+      // 취소 결과는 소켓에서 반영
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('참여 요청 취소 실패: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -124,27 +180,19 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
                   Text('출발: ${widget.pot.originAddress}'),
                   Text('도착: ${widget.pot.destAddress}'),
                   const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: _accessToken == null || _loading
-                        ? null
-                        : () async {
-                      try {
-                        setState(() => _loading = true);
-                        await PartyService.attendParty(
-                          partyId: widget.pot.id,
-                          accessToken: _accessToken!,
-                        );
-                        // 수락/거절 결과는 소켓에서!
-                      } catch (e) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('참가 실패: $e')),
-                        );
-                      } finally {
-                        if (mounted) setState(() => _loading = false);
-                      }
-                    },
-                    child: const Text('팟 신청하기'),
-                  ),
+                  if (_joinStatus == 'IDLE' || _joinStatus == 'WAIT')
+                    ElevatedButton(
+                      onPressed: _accessToken == null || _loading
+                          ? null
+                          : _joinParty,
+                      child: const Text('팟 신청하기'),
+                    ),
+                  if (_joinStatus == 'PENDING')
+                    ElevatedButton(
+                      onPressed: _loading ? null : _cancelJoinRequest,
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                      child: const Text('참여 요청 취소'),
+                    ),
                 ],
               ),
             );
