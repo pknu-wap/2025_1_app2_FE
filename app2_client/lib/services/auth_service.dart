@@ -118,6 +118,11 @@ class AuthService {
       'gender': gender,
       if (profileImageUrl != null) 'profileImageUrl': profileImageUrl,
     };
+    
+    // 요청 데이터 로깅 추가
+    print('📤 Register Request:');
+    print(jsonEncode(body));
+    
     final resp = await http.post(
       url,
       headers: {'Content-Type': 'application/json'},
@@ -125,13 +130,17 @@ class AuthService {
     );
     if (resp.statusCode == 200) {
       final authResp = AuthResponse.fromJson(jsonDecode(resp.body));
-      // 회원가입 성공 시 토큰도 로그에 찍어 봅니다.
       print('✅ Server Register Success');
       print('   ▶ accessToken:  ${authResp.accessToken}');
       print('   ▶ refreshToken: ${authResp.refreshToken}');
       return authResp;
     }
-    print('🔴 register failed (${resp.statusCode}): ${resp.body}');
+    
+    // 에러 응답 상세 로깅
+    print('🔴 Register failed (${resp.statusCode}):');
+    print('   ▶ Response body: ${resp.body}');
+    print('   ▶ Request URL: $url');
+    print('   ▶ Headers: ${resp.headers}');
     return null;
   }
 }
