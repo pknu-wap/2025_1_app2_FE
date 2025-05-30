@@ -251,7 +251,7 @@ packages:
     description:
       path: "."
       ref: master
-      resolved-ref: "29ff59d1b39acf8d8f72cdd1ac1df9ef4d1cec25"
+      resolved-ref: b2763747c70d54d42ac32bc59d303432dc6db51f
       url: "https://github.com/lepitaaar/flutter_sms.git"
     source: git
     version: "2.3.3"
