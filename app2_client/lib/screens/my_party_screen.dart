@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/party_detail_model.dart';
 import '../services/socket_service.dart';
+import '../services/party_service.dart';
+import '../providers/auth_provider.dart';
 
 class JoinRequest {
   final int requestId;
@@ -9,7 +12,6 @@ class JoinRequest {
 
   JoinRequest({required this.requestId, required this.userName, required this.userEmail});
 
-  // 서버 메시지 포맷에 맞게 파싱
   factory JoinRequest.fromJson(Map<String, dynamic> json) {
     return JoinRequest(
       requestId: json['request_id'],
@@ -29,29 +31,49 @@ class MyPartyScreen extends StatefulWidget {
 }
 
 class _MyPartyScreenState extends State<MyPartyScreen> {
+  late PartyDetail party;
   List<JoinRequest> joinRequests = [];
 
   @override
   void initState() {
     super.initState();
+    party = widget.party;
 
-    // 실제 토큰으로 교체 필요!
-    SocketService.connect('YOUR_ACCESS_TOKEN');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final accessToken = Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
+      if (accessToken == null) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('로그인이 필요합니다.')),
+        );
+        return;
+      }
 
-    // 방장용 구독: 파티ID별로 구독
-    SocketService.subscribe(
-      topic: "/sub/party/${widget.party.partyId}",
-      onMessage: (msg) {
-        print("💬 받은 메시지: $msg");
-        // 예시: {"type": "JOIN_REQUEST", "request_id": 17, "name": "신청자", "email": "..."}
-        if (msg['type'] == 'JOIN_REQUEST') {
-          setState(() {
-            joinRequests.add(JoinRequest.fromJson(msg));
-          });
-        }
-        // TODO: 수락/거절 처리 응답 메시지 처리 (있으면)
-      },
-    );
+      SocketService.connect(accessToken);
+
+      // [1] 참여요청 및 파티 멤버 갱신 브로드캐스트 모두 구독!
+      SocketService.subscribe(
+        topic: "/sub/party/${party.partyId}",
+        onMessage: (msg) async {
+          print("💬 받은 메시지: $msg");
+          if (msg['type'] == 'JOIN_REQUEST') {
+            setState(() {
+              joinRequests.add(JoinRequest.fromJson(msg));
+            });
+          } else if (msg['eventType'] == 'MEMBER_JOIN' || msg['eventType'] == 'PARTY_UPDATE') {
+            // 멤버 갱신 메시지 수신 시 PartyDetail을 다시 불러옴
+            try {
+              final detail = await PartyService.fetchPartyDetailById(party.partyId.toString());
+              setState(() {
+                party = detail;
+              });
+            } catch (e) {
+              print("파티정보 갱신 실패: $e");
+            }
+          }
+        },
+      );
+    });
   }
 
   @override
@@ -61,27 +83,44 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
   }
 
   Future<void> _acceptRequest(int requestId) async {
-    // TODO: 실제로 서버에 수락 API 호출
-    print('수락: $requestId');
-    setState(() {
-      joinRequests.removeWhere((r) => r.requestId == requestId);
-    });
-    // await PartyService.acceptRequest(...);
+    final accessToken = Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
+    if (accessToken == null) return;
+
+    try {
+      await PartyService.acceptJoinRequest(
+        partyId: party.partyId.toString(),
+        requestId: requestId,
+        accessToken: accessToken,
+      );
+      setState(() {
+        joinRequests.removeWhere((r) => r.requestId == requestId);
+      });
+      // 수락 후 멤버 리스트는 실시간 브로드캐스트로 자동 갱신됨!
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('수락 실패: $e')));
+    }
   }
 
   Future<void> _rejectRequest(int requestId) async {
-    // TODO: 실제로 서버에 거절 API 호출
-    print('거절: $requestId');
-    setState(() {
-      joinRequests.removeWhere((r) => r.requestId == requestId);
-    });
-    // await PartyService.rejectRequest(...);
+    final accessToken = Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
+    if (accessToken == null) return;
+
+    try {
+      await PartyService.rejectJoinRequest(
+        partyId: party.partyId.toString(),
+        requestId: requestId,
+        accessToken: accessToken,
+      );
+      setState(() {
+        joinRequests.removeWhere((r) => r.requestId == requestId);
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('거절 실패: $e')));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final party = widget.party;
-
     return Scaffold(
       appBar: AppBar(title: const Text('내 파티')),
       body: SingleChildScrollView(
@@ -131,7 +170,6 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
             )),
             const SizedBox(height: 24),
 
-            // 신규: 참여요청 리스트!
             if (joinRequests.isNotEmpty) ...[
               const Divider(),
               const Text('신규 참여요청', style: TextStyle(fontWeight: FontWeight.bold)),
