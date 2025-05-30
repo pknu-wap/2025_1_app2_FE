@@ -251,7 +251,7 @@ packages:
     description:
       path: "."
       ref: master
-      resolved-ref: "29ff59d1b39acf8d8f72cdd1ac1df9ef4d1cec25"
+      resolved-ref: b2763747c70d54d42ac32bc59d303432dc6db51f
       url: "https://github.com/lepitaaar/flutter_sms.git"
     source: git
     version: "2.3.3"
@@ -702,6 +702,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.12.1"
+  stomp_dart_client:
+    dependency: "direct main"
+    description:
+      name: stomp_dart_client
+      sha256: "8779d1383f0a6faa0623af27ab6d4b228ab76c75020d9a83ade5ee204eac5153"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.4.4"
   stream_channel:
     dependency: transitive
     description:
@@ -846,6 +854,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.1"
+  web_socket_channel:
+    dependency: transitive
+    description:
+      name: web_socket_channel
+      sha256: d88238e5eac9a42bb43ca4e721edba3c08c6354d4a53063afaa568516217621b
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.4.0"
   webview_flutter:
     dependency: "direct main"
     description:

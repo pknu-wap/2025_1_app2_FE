@@ -11,6 +11,7 @@ import 'package:app2_client/widgets/party_create_modal.dart';
 
 import 'package:app2_client/models/party_model.dart';
 import 'package:app2_client/services/party_service.dart';
+import 'package:app2_client/services/socket_service.dart'; // 추가!
 import 'package:app2_client/providers/auth_provider.dart';
 
 class PartyMapScreen extends StatefulWidget {
@@ -37,6 +38,7 @@ class _PartyMapScreenState extends State<PartyMapScreen> {
   WebViewController? _controller;
   bool   _pageLoaded = false;
   List<PartyModel> _pots = [];
+  bool _subscribed = false;
 
   /* ───────────────────────── Map Drag-enable 토글 ───────────────────────── */
   Future<void> _setMapInteractive(bool enable) async {
@@ -52,6 +54,26 @@ class _PartyMapScreenState extends State<PartyMapScreen> {
     super.initState();
     _initWebView();
     _loadPots();
+
+    // 파티 외부 사용자용 실시간 브로드캐스트 구독
+    // 중복 구독 방지 플래그 사용
+    if (!_subscribed) {
+      SocketService.subscribe(
+        topic: "/topic/parties/public-updates",
+        onMessage: (msg) {
+          // print("🌐 외부 파티 업데이트: $msg");
+          _loadPots(); // 실시간으로 파티 목록 새로고침
+        },
+      );
+      _subscribed = true;
+    }
+  }
+
+  @override
+  void dispose() {
+    // 여긴 소켓 연결 끊으면 안됨(검색화면은 앱 전체에서 계속 유지할 수도 있음)
+    // 필요하다면 SocketService.unsubscribe('/topic/parties/public-updates'); 호출
+    super.dispose();
   }
 
   Future<void> _initWebView() async {
@@ -105,9 +127,9 @@ class _PartyMapScreenState extends State<PartyMapScreen> {
   /* ───────────────────────── 서버에서 파티 목록 ───────────────────────── */
   Future<void> _loadPots() async {
     final list = await PartyService.fetchNearbyParties(
-      lat: widget.initialLat,
-      lng: widget.initialLng,
-      radiusKm: 50
+        lat: widget.initialLat,
+        lng: widget.initialLng,
+        radiusKm: 50
     );
     setState(() => _pots = list);
     if (_pageLoaded) _renderMarkers();
