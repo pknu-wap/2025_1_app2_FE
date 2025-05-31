@@ -56,7 +56,7 @@ class _StopoverSettingScreenState extends State<StopoverSettingScreen> {
         ),
         accessToken: token,
       );
-      // (옵션) 화면에 새로 업데이트된 데이터를 반영하려면:
+      // 화면에 반영하려면 업데이트된 리스트 중 해당 아이템만 찾아서 덮어쓰기
       final updated = updatedList.firstWhere((e) =>
       e.stopover.id == _stopover.stopover.id);
       setState(() => _stopover = updated);
@@ -179,7 +179,8 @@ class _StopoverSettingScreenState extends State<StopoverSettingScreen> {
           children: [
             Text(
               '경유지: ${_stopover.stopover.location.address}',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              style:
+              const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
             const SizedBox(height: 12),
             const Text('내릴 멤버 목록', style: TextStyle(fontWeight: FontWeight.bold)),

@@ -127,7 +127,7 @@ class PartyService {
     return null;
   }
 
-  /// 파티 상세정보 조회
+  /// 파티 상세조회
   static Future<PartyDetail> fetchPartyDetailById(String partyId) async {
     final url = "${ApiConstants.partyEndpoint}/$partyId";
     final response = await DioClient.dio.get(url);
