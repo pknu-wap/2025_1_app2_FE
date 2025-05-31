@@ -45,48 +45,60 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
   // 로컬에 보관할 StopoverResponse 리스트
   List<StopoverResponse> _stopoverList = [];
 
+  bool _socketSubscribed = false;
+
   @override
   void initState() {
     super.initState();
     _party = widget.party;
     _desc = widget.description ?? '';
     _descController.text = _desc!;
-    _subscribeSocket();
+    _connectAndSubscribe();
 
     // WebView(파티 지도) 초기화
     _initMapWebView();
   }
 
-  void _subscribeSocket() {
+  /// STOMP 연결 및 호스트 전용 구독 (참여 요청 응답 채널 + 파티 내부 업데이트)
+  void _connectAndSubscribe() {
     final token =
         Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
     if (token == null) return;
-    SocketService.connect(token);
 
-    SocketService.subscribe(
-      topic: "/sub/party/${_party.partyId}",
-      onMessage: (msg) async {
-        // 참여 요청 수신
-        if (msg['type'] == 'JOIN_REQUEST') {
-          setState(() {
-            _joinRequests.add(JoinRequest.fromJson(msg));
-          });
-        }
-        // 멤버 리스트 갱신 or 파티 업데이트 메시지 수신
-        else if (msg['eventType'] == 'MEMBER_JOIN' ||
-            msg['eventType'] == 'PARTY_UPDATE') {
-          final updated = await PartyService.fetchPartyDetailById(
-              _party.partyId.toString());
-          setState(() {
-            _party = updated;
-            // 만약 서버가 StopoverResponse를 내려준다면 여기서 _stopoverList도 업데이트
-            // 예: _stopoverList = updated.stopovers;
-          });
-          // 지도 마커 업데이트
-          _refreshAllMarkers();
-        }
-      },
-    );
+    SocketService.connect(token, onConnect: () {
+      if (!_socketSubscribed) {
+        // 1) 호스트에게 날아오는 “참여 요청 응답” (PENDING, APPROVED, REJECTED, CANCELED)
+        SocketService.subscribeJoinRequestResponse(onMessage: (msg) {
+          // msg 안에 type이 "JOIN_REQUEST"인 경우엔 새 요청 정보를 _joinRequests에 추가
+          if (msg['type'] == 'JOIN_REQUEST') {
+            setState(() {
+              _joinRequests.add(JoinRequest.fromJson(msg));
+            });
+          }
+        });
+
+        // 2) 파티 내부 업데이트(멤버 JOIN, 파티 업데이트 등)
+        SocketService.subscribePartyMembers(
+          partyId: _party.partyId,
+          onMessage: (msg) async {
+            final eventType = msg['eventType'];
+            if (eventType == 'MEMBER_JOIN' || eventType == 'PARTY_UPDATE') {
+              final updated = await PartyService.fetchPartyDetailById(
+                _party.partyId.toString(),
+              );
+              setState(() {
+                _party = updated;
+                // 만약 서버가 StopoverResponse를 내려준다면 여기서 _stopoverList도 업데이트
+                // 예: _stopoverList = updated.stopovers;
+              });
+              _refreshAllMarkers();
+            }
+          },
+        );
+
+        _socketSubscribed = true;
+      }
+    });
   }
 
   @override
@@ -314,9 +326,10 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
 
                   // 새로 추가된 경유지가 있으면 → “하차 지점 설정 화면”으로 바로 이동
                   if (newList.isNotEmpty) {
-                    final added = newList.firstWhere((e) =>
-                    e.stopover.location.address == address &&
-                        e.partyMembers.any((m) => m.email == email),
+                    final added = newList.firstWhere(
+                            (e) =>
+                        e.stopover.location.address == address &&
+                            e.partyMembers.any((m) => m.email == email),
                         orElse: () => newList.first);
 
                     Navigator.of(context).pop(); // 다이얼로그 닫기
@@ -523,8 +536,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                         ),
                       ),
                       IconButton(
-                        icon:
-                        const Icon(Icons.check, color: Colors.green),
+                        icon: const Icon(Icons.check, color: Colors.green),
                         onPressed: _saveDesc,
                       ),
                     ],
@@ -539,8 +551,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                       ),
                       IconButton(
                         icon: const Icon(Icons.edit, size: 20),
-                        onPressed: () =>
-                            setState(() => _editingDesc = true),
+                        onPressed: () => setState(() => _editingDesc = true),
                       ),
                     ],
                   ),
@@ -575,7 +586,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                   const SizedBox(height: 24),
                   const Divider(),
 
-                  // **경유지 리스트** (간단히 ListTile 형태로 표시)
+                  // **경유지 목록**
                   if (_stopoverList.isNotEmpty) ...[
                     const Text('경유지 목록',
                         style: TextStyle(fontWeight: FontWeight.bold)),
