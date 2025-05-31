@@ -8,6 +8,7 @@ import 'package:app2_client/models/party_detail_model.dart';
 import 'package:app2_client/models/stopover_model.dart';
 import 'package:app2_client/models/location_model.dart';
 import 'package:app2_client/services/dio_client.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/party_member_model.dart';
 
@@ -17,7 +18,7 @@ class PartyService {
     required double lat,
     required double lng,
     required double radiusKm,
-    required String accessToken,  // ← 토큰 인자 필수로 추가
+    required String accessToken,
   }) async {
     final body = {
       'lat': lat,
@@ -26,23 +27,54 @@ class PartyService {
     };
 
     try {
+      debugPrint('📤 주변 파티 검색 요청 - body: $body');
+      
       final response = await DioClient.dio.post(
         ApiConstants.partySearchEndpoint,
         data: body,
         options: Options(
           headers: {
-            'Authorization': 'Bearer $accessToken',  // ← 헤더에 토큰 넣기
+            'Authorization': 'Bearer $accessToken',
           },
         ),
       );
-      if (response.statusCode != 200) return [];
+      
+      debugPrint('📥 서버 응답 - statusCode: ${response.statusCode}, data: ${response.data}');
+      
+      if (response.statusCode == 401) {
+        throw Exception('인증이 만료되었습니다. 다시 로그인해주세요.');
+      }
+      
+      if (response.statusCode == 404) {
+        throw Exception('주변에 파티가 없습니다.');
+      }
+      
+      if (response.statusCode != 200) {
+        throw Exception('서버 오류가 발생했습니다. (상태 코드: ${response.statusCode})');
+      }
+
       final List<dynamic> jsonList = response.data as List<dynamic>;
-      return jsonList
+      final parties = jsonList
           .map((e) => PartyModel.fromJson(e as Map<String, dynamic>))
           .toList();
+          
+      debugPrint('✅ 파싱 완료 - 파티 ${parties.length}개 발견');
+      return parties;
+      
+    } on DioException catch (e) {
+      debugPrint('❌ Dio 예외 발생 - type: ${e.type}, message: ${e.message}');
+      debugPrint('❌ 응답 데이터: ${e.response?.data}');
+      
+      if (e.type == DioExceptionType.connectionTimeout) {
+        throw Exception('서버 연결 시간이 초과되었습니다.');
+      } else if (e.type == DioExceptionType.connectionError) {
+        throw Exception('인터넷 연결을 확인해주세요.');
+      } else {
+        throw Exception('파티 검색 중 오류가 발생했습니다: ${e.message}');
+      }
     } catch (e) {
-      // 에러 발생 시 빈 리스트 반환
-      return [];
+      debugPrint('❌ 예외 발생: $e');
+      throw Exception('알 수 없는 오류가 발생했습니다: $e');
     }
   }
 

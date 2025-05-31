@@ -148,16 +148,25 @@ class _PartyMapScreenState extends State<PartyMapScreen> {
       return;
     }
 
-    // 지구 전체 범위의 반경을 주어 “모든 파티”를 가져오도록 설정
-    const extremelyLargeRadius = 20000.0; // 약 20,000km
+    // 검색 반경을 10km로 증가
+    const searchRadius = 10.0; // 10km 반경 내 파티 검색
+    
+    debugPrint('🔍 파티 검색 시작 - 위치: (${widget.initialLat}, ${widget.initialLng}), 반경: ${searchRadius}km');
+    
     try {
       final list = await PartyService.fetchNearbyParties(
         lat: widget.initialLat,
         lng: widget.initialLng,
-        radiusKm: extremelyLargeRadius,
-        accessToken: token, // ← 반드시 토큰을 넘겨야 함
+        radiusKm: searchRadius,
+        accessToken: token,
       );
       debugPrint('▶️ fetchNearbyParties 응답: 파티 개수 = ${list.length}');
+      
+      // 검색된 파티들의 위치 정보를 로그로 출력
+      for (final party in list) {
+        debugPrint('📍 파티 발견 - ID: ${party.id}, 위치: (${party.destLat}, ${party.destLng}), 생성자: ${party.creatorName}');
+      }
+      
       setState(() {
         _pots = list;
       });
@@ -166,6 +175,11 @@ class _PartyMapScreenState extends State<PartyMapScreen> {
       }
     } catch (e) {
       debugPrint('‼️ fetchNearbyParties 예외 발생: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('주변 파티를 불러오는데 실패했습니다: $e')),
+        );
+      }
     }
   }
 
