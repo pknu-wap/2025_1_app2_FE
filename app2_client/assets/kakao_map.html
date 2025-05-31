@@ -1,18 +1,18 @@
+<!-- assets/kakao_map.html -->
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8" />
-    <title>지도 띄우기</title>
+    <title>파티 목적지 선택</title>
 </head>
 <body>
 <div id="map" style="width:100%; height:100vh;"></div>
 
-<!-- Kakao Maps SDK -->
-<script
-        src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={{KAKAO_JS_KEY}}&libraries=services">
-</script>
+<!-- Kakao Maps SDK: 실제 발급받은 JavaScript Key를 {{KAKAO_JS_KEY}} 자리에 넣어야 합니다. -->
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={{KAKAO_JS_KEY}}&libraries=services"></script>
 
 <script>
+    // Flutter 코드에서 치환해 넣어 주는 초기 중심 좌표
     let map;
     let selectedLatLng = { lat: {{LAT}}, lng: {{LNG}} };
 
@@ -20,40 +20,23 @@
       const container = document.getElementById('map');
       const options = {
         center: new kakao.maps.LatLng(selectedLatLng.lat, selectedLatLng.lng),
-        level: 4  // 기본 줌 레벨
+        level: 4  // 초기 줌 레벨
       };
       map = new kakao.maps.Map(container, options);
 
-      // 클릭 시 목적지 좌표 저장
+      // 클릭 시 selectedLatLng에 최신 좌표를 덮어쓴다
       kakao.maps.event.addListener(map, 'click', function (mouseEvent) {
         const ll = mouseEvent.latLng;
         selectedLatLng = { lat: ll.getLat(), lng: ll.getLng() };
       });
     };
 
-    // Flutter에서 호출: 목적지 좌표 반환
+    // Flutter → JS 호출: 현재 선택된 좌표(JSON)를 반환
     window.getSelectedDestination = function () {
       return JSON.stringify(selectedLatLng);
     };
 
-    // Flutter에서 호출: 파티 마커 추가
-    window.addMarker = function(id, lat, lng, title) {
-      const position = new kakao.maps.LatLng(lat, lng);
-      const marker = new kakao.maps.Marker({
-        map: map,
-        position: position,
-        title: title,
-        image: new kakao.maps.MarkerImage(
-          'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_blue.png',
-          new kakao.maps.Size(36, 54),
-          { offset: new kakao.maps.Point(18, 54) }
-        )
-      });
-
-      kakao.maps.event.addListener(marker, 'click', function() {
-        MarkerClick.postMessage(JSON.stringify({ id: id, lat: lat, lng: lng }));
-      });
-    };
+    // (참고) 파티 생성 시에는 마커가 필요 없으므로 addMarker 함수는 생략하거나 그냥 두어도 무방합니다.
 </script>
 </body>
 </html>
