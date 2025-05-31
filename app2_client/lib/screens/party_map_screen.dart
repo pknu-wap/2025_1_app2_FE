@@ -47,7 +47,7 @@ class _PartyMapScreenState extends State<PartyMapScreen> {
     super.initState();
     _initWebView();
     _connectAndSubscribe();
-    _loadPots();
+    _loadPots();  // 최초 로드
   }
 
   /// STOMP 연결 및 Public Updates 구독
@@ -71,7 +71,6 @@ class _PartyMapScreenState extends State<PartyMapScreen> {
 
   @override
   void dispose() {
-    // 이 화면을 벗어나더라도 소켓 연결은 유지하므로 여기서는 따로 disconnect하지 않습니다.
     super.dispose();
   }
 
@@ -129,19 +128,26 @@ class _PartyMapScreenState extends State<PartyMapScreen> {
       }).setMap(map);
     """);
 
-    // 페이지 로딩 완료 플래그 세팅
     setState(() {
       _pageLoaded = true;
     });
 
-    // 이미 서버에서 받아온 파티가 있으면 지도에 마커 뿌리기
+    // 이미 서버에서 받아온 파티가 있으면 지도의 마커를 찍음
     if (_pots.isNotEmpty) {
       _renderMarkers();
     }
   }
 
-  /// 서버에서 파티 목록을 가져와 _pots 업데이트
+  /// 서버에서 파티 목록을 가져와 _pots 업데이트 (토큰 포함)
   Future<void> _loadPots() async {
+    final token =
+        Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
+    if (token == null) {
+      // 토큰이 없으면 빈 리스트로 초기화
+      setState(() => _pots = []);
+      return;
+    }
+
     // 지구 전체 범위의 반경을 주어 “모든 파티”를 가져오도록 설정
     const extremelyLargeRadius = 20000.0; // 약 20,000km
     try {
@@ -149,12 +155,9 @@ class _PartyMapScreenState extends State<PartyMapScreen> {
         lat: widget.initialLat,
         lng: widget.initialLng,
         radiusKm: extremelyLargeRadius,
+        accessToken: token, // ← 반드시 토큰을 넘겨야 함
       );
       debugPrint('▶️ fetchNearbyParties 응답: 파티 개수 = ${list.length}');
-      for (var p in list) {
-        debugPrint(
-            '   • PartyModel(id=${p.id}, destLat=${p.destLat}, destLng=${p.destLng})');
-      }
       setState(() {
         _pots = list;
       });
@@ -163,7 +166,6 @@ class _PartyMapScreenState extends State<PartyMapScreen> {
       }
     } catch (e) {
       debugPrint('‼️ fetchNearbyParties 예외 발생: $e');
-      // 필요 시 사용자에게 오류 스낵바 표시 가능
     }
   }
 

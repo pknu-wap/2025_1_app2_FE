@@ -12,11 +12,12 @@ import 'package:app2_client/services/dio_client.dart';
 import '../models/party_member_model.dart';
 
 class PartyService {
-  /// 주변 팟 조회
+  /// 주변 팟 조회 (Authorization 헤더 추가)
   static Future<List<PartyModel>> fetchNearbyParties({
     required double lat,
     required double lng,
     required double radiusKm,
+    required String accessToken,  // ← 토큰 인자 필수로 추가
   }) async {
     final body = {
       'lat': lat,
@@ -28,6 +29,11 @@ class PartyService {
       final response = await DioClient.dio.post(
         ApiConstants.partySearchEndpoint,
         data: body,
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $accessToken',  // ← 헤더에 토큰 넣기
+          },
+        ),
       );
       if (response.statusCode != 200) return [];
       final List<dynamic> jsonList = response.data as List<dynamic>;
@@ -35,6 +41,7 @@ class PartyService {
           .map((e) => PartyModel.fromJson(e as Map<String, dynamic>))
           .toList();
     } catch (e) {
+      // 에러 발생 시 빈 리스트 반환
       return [];
     }
   }
@@ -126,7 +133,8 @@ class PartyService {
 
   /// 내가 만든 파티 조회
   static Future<PartyDetail?> getMyParty() async {
-    final response = await DioClient.dio.post("${ApiConstants.baseUrl}/api/party/my");
+    final response =
+    await DioClient.dio.post("${ApiConstants.baseUrl}/api/party/my");
     if (response.statusCode == 200) {
       return PartyDetail.fromJson(response.data as Map<String, dynamic>);
     }
@@ -206,7 +214,8 @@ class PartyService {
     required String partyMemberId,
     required String accessToken,
   }) async {
-    final url = "${ApiConstants.partyEndpoint}/$partyId/member/$partyMemberId/bookkeeper";
+    final url =
+        "${ApiConstants.partyEndpoint}/$partyId/member/$partyMemberId/bookkeeper";
     final response = await DioClient.dio.patch(
       url,
       options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
