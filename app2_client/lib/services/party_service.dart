@@ -42,11 +42,15 @@ class PartyService {
   /// 파티 생성
   static Future<PartyDetail> createParty({
     required PartyCreateRequest request,
+    required String accessToken,
   }) async {
     final body = request.toJson();
     final response = await DioClient.dio.post(
       ApiConstants.partyEndpoint,
       data: body,
+      options: Options(
+        headers: {'Authorization': 'Bearer $accessToken'},
+      ),
     );
     if (response.statusCode != 200) {
       throw Exception('파티 생성 실패: ${response.statusCode}');
@@ -60,7 +64,10 @@ class PartyService {
     required String accessToken,
   }) async {
     final url = "${ApiConstants.partyEndpoint}/$partyId/attend";
-    final response = await DioClient.dio.post(url);
+    final response = await DioClient.dio.post(
+      url,
+      options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+    );
     if (response.statusCode != 200) {
       throw Exception('파티 참여 실패: ${response.data}');
     }
@@ -119,8 +126,7 @@ class PartyService {
 
   /// 내가 만든 파티 조회
   static Future<PartyDetail?> getMyParty() async {
-    final response =
-    await DioClient.dio.post("${ApiConstants.baseUrl}/api/party/my");
+    final response = await DioClient.dio.post("${ApiConstants.baseUrl}/api/party/my");
     if (response.statusCode == 200) {
       return PartyDetail.fromJson(response.data as Map<String, dynamic>);
     }
@@ -200,8 +206,7 @@ class PartyService {
     required String partyMemberId,
     required String accessToken,
   }) async {
-    final url =
-        "${ApiConstants.partyEndpoint}/$partyId/member/$partyMemberId/bookkeeper";
+    final url = "${ApiConstants.partyEndpoint}/$partyId/member/$partyMemberId/bookkeeper";
     final response = await DioClient.dio.patch(
       url,
       options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
