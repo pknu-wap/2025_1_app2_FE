@@ -70,7 +70,7 @@ class _PartyCreateModalState extends State<PartyCreateModal> {
         accessToken: token,
       );
 
-      // 4) 디버그용으로 “생성 완료” 로그 찍기
+      // 4) 디버그용으로 "생성 완료" 로그 찍기
       debugPrint('파티 생성 성공: partyId=${party.partyId}, dest=${party.destAddress}');
 
       // 5) 모달을 닫고 MyPartyScreen으로 이동
@@ -108,117 +108,127 @@ class _PartyCreateModalState extends State<PartyCreateModal> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-          left: 16,
-          right: 16,
-          top: 24,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // ─────────────────────────────────────────────────────────────────────────
-            // (Drag Handle 표시용)
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
+    return Consumer<AuthProvider>(
+      builder: (context, auth, child) {
+        final token = auth.tokens?.accessToken;
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+              left: 16,
+              right: 16,
+              top: 24,
             ),
-
-            const Text('파티 생성',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
-
-            // 출발/도착 정보 표시
-            Align(alignment: Alignment.centerLeft, child: Text('출발: ${widget.startAddress}')),
-            Align(alignment: Alignment.centerLeft, child: Text('도착: ${widget.destAddress}')),
-            const Divider(height: 32),
-
-            // 설명 입력란
-            TextField(
-              controller: _descController,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: "파티 설명 (선택)",
-                hintText: "예) 서면까지 갈 사람 구해요~!",
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // ───────── 반경 설정 ─────────
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text('반경: ${(_radius / 1000).toStringAsFixed(1)} km'),
-                Expanded(
-                  child: Slider(
-                    min: 1000,
-                    max: 10000,
-                    divisions: 9,
-                    value: _radius,
-                    label: '${(_radius / 1000).toStringAsFixed(1)} km',
-                    onChanged: (v) => setState(() => _radius = v),
+                // ─────────────────────────────────────────────────────────────────────────
+                // (Drag Handle 표시용)
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-              ],
-            ),
 
-            // ───────── 최대 인원 ─────────
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('최대 인원'),
-                DropdownButton<int>(
-                  value: _maxPerson,
-                  items: [1, 2, 3, 4]
-                      .map((n) => DropdownMenuItem(value: n, child: Text('$n명')))
-                      .toList(),
-                  onChanged: (v) => setState(() => _maxPerson = v!),
+                const Text('파티 생성',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 20),
+
+                // 출발/도착 정보 표시
+                Align(alignment: Alignment.centerLeft, child: Text('출발: ${widget.startAddress}')),
+                Align(alignment: Alignment.centerLeft, child: Text('도착: ${widget.destAddress}')),
+                const Divider(height: 32),
+
+                // 설명 입력란
+                TextField(
+                  controller: _descController,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: "파티 설명 (선택)",
+                    hintText: "예) 서면까지 갈 사람 구해요~!",
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ],
-            ),
+                const SizedBox(height: 20),
 
-            // ───────── 옵션 ─────────
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('팟 옵션'),
-                DropdownButton<String>(
-                  value: _option,
-                  items: const [
-                    DropdownMenuItem(value: 'MIXED', child: Text('혼성')),
-                    DropdownMenuItem(value: 'ONLY_MALE', child: Text('남성만')),
-                    DropdownMenuItem(value: 'ONLY_FEMALE', child: Text('여성만')),
+                // ───────── 반경 설정 ─────────
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('반경: ${(_radius / 1000).toStringAsFixed(1)} km'),
+                    Expanded(
+                      child: Slider(
+                        min: 1000,
+                        max: 10000,
+                        divisions: 9,
+                        value: _radius,
+                        label: '${(_radius / 1000).toStringAsFixed(1)} km',
+                        onChanged: (v) => setState(() => _radius = v),
+                      ),
+                    ),
                   ],
-                  onChanged: (v) => setState(() => _option = v!),
                 ),
+
+                // ───────── 최대 인원 ─────────
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('최대 인원'),
+                    DropdownButton<int>(
+                      value: _maxPerson,
+                      items: [1, 2, 3, 4]
+                          .map((n) => DropdownMenuItem(value: n, child: Text('$n명')))
+                          .toList(),
+                      onChanged: (v) => setState(() => _maxPerson = v!),
+                    ),
+                  ],
+                ),
+
+                // ───────── 옵션 ─────────
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('팟 옵션'),
+                    DropdownButton<String>(
+                      value: _option,
+                      items: const [
+                        DropdownMenuItem(value: 'MIXED', child: Text('혼성')),
+                        DropdownMenuItem(value: 'ONLY_MALE', child: Text('남성만')),
+                        DropdownMenuItem(value: 'ONLY_FEMALE', child: Text('여성만')),
+                      ],
+                      onChanged: (v) => setState(() => _option = v!),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 28),
+
+                // ───────── 생성 버튼 ─────────
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _submitting || token == null ? null : _submit,
+                    style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                    child: _submitting
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text('생성하기'),
+                  ),
+                ),
+                if (token == null)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 12),
+                    child: Text('로그인이 필요합니다.', style: TextStyle(color: Colors.red)),
+                  ),
+                const SizedBox(height: 12),
               ],
             ),
-
-            const SizedBox(height: 28),
-
-            // ───────── 생성 버튼 ─────────
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _submitting ? null : _submit,
-                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
-                child: _submitting
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('생성하기'),
-              ),
-            ),
-            const SizedBox(height: 12),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
