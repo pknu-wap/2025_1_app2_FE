@@ -47,25 +47,51 @@ class _PartyMapScreenState extends State<PartyMapScreen> {
     super.initState();
     _initWebView();
     _connectAndSubscribe();
+    
+    // 초기 로드 후 3초 뒤에 한 번 더 갱신
     _loadPots();  // 최초 로드
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) _loadPots();  // 3초 후 재시도
+    });
   }
 
   /// STOMP 연결 및 Public Updates 구독
   void _connectAndSubscribe() {
     final token =
         Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
-    if (token == null) return;
+    if (token == null) {
+      debugPrint('❌ WebSocket 연결 실패: 토큰이 없습니다.');
+      return;
+    }
 
+    debugPrint('🔌 WebSocket 연결 시도...');
+    
     // 1) STOMP 연결
     SocketService.connect(token, onConnect: () {
+      debugPrint('✅ WebSocket 연결 성공');
+      
       // 2) 연결 직후 Public Updates 토픽 구독
       if (!_subscribed) {
+        debugPrint('📡 Public Updates 토픽 구독 시작');
+        
         SocketService.subscribePublicUpdates(onMessage: (message) {
+          debugPrint('📨 Public Updates 메시지 수신: $message');
+          
           // 파티 생성/업데이트 이벤트가 오면, 리스트를 다시 가져와서 지도 갱신
           _loadPots();
+          
+          // 추가: 파티 생성 이벤트인 경우 즉시 갱신
+          if (message['type'] == 'PARTY_CREATED') {
+            debugPrint('🎉 새로운 파티 생성됨 - 즉시 갱신');
+            Future.delayed(const Duration(milliseconds: 500), _loadPots);
+          }
         });
+        
         _subscribed = true;
+        debugPrint('✅ Public Updates 구독 완료');
       }
+    }, onError: (error) {
+      debugPrint('❌ WebSocket 에러 발생: $error');
     });
   }
 

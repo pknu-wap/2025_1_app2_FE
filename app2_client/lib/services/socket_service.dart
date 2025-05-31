@@ -5,6 +5,7 @@ import 'package:stomp_dart_client/stomp.dart';
 import 'package:stomp_dart_client/stomp_config.dart';
 import 'package:stomp_dart_client/stomp_frame.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/foundation.dart';
 
 /// SocketService: STOMP over WebSocket 연결용 헬퍼 클래스
 /// - 백엔드(Spring)가 registerStompEndpoints("/ws").withSockJS() 로 열어 두었다면,
@@ -14,7 +15,7 @@ class SocketService {
   // .env에 정의된 백엔드 기본 URL (예: "http://3.105.16.234:8080")
   static final String _backendBase = dotenv.env['BACKEND_BASE_URL'] ?? '';
 
-  static StompClient? _client;
+  static StompClient? _stompClient;
   static bool _connected = false;
 
   /// “순수 WebSocket”으로 STOMP 연결할 URL을 만들어 줍니다.
@@ -32,52 +33,118 @@ class SocketService {
     return '$wsBase/ws?token=$token';
   }
 
-  /// STOMP over WebSocket 연결 수행
-  static void connect(String token, {void Function()? onConnect}) {
-    if (_connected) return;
+  /// Public Updates 토픽 구독 (파티 생성/업데이트/삭제 등)
+  static void subscribePublicUpdates({
+    required void Function(Map<String, dynamic>) onMessage,
+  }) {
+    if (_stompClient == null) {
+      debugPrint('❌ STOMP 클라이언트가 초기화되지 않았습니다.');
+      return;
+    }
 
-    final url = _webSocketUrl(token);
-    print('🔌 STOMP(WebSocket) 접속 시도 → $url');
+    if (!_stompClient!.isActive) {
+      debugPrint('❌ STOMP 연결이 활성화되지 않았습니다. 재연결을 시도합니다.');
+      _reconnect();
+      return;
+    }
 
-    _client = StompClient(
-      config: StompConfig(
-        // 순수 WebSocket으로 연결하겠다는 설정
-        url: url,
-        onConnect: (StompFrame frame) {
-          _connected = true;
-          print('✅ STOMP/WebSocket 연결 성공 (URL: $url)');
-          if (onConnect != null) onConnect();
+    debugPrint('📡 Public Updates 토픽 구독 시작: /topic/public-updates');
+    
+    _stompClient?.subscribe(
+      destination: '/topic/public-updates',
+      callback: (frame) {
+        debugPrint('📨 Public Updates 메시지 수신: ${frame.body}');
+        
+        try {
+          final data = jsonDecode(frame.body!) as Map<String, dynamic>;
+          onMessage(data);
+        } catch (e) {
+          debugPrint('❌ 메시지 파싱 실패: $e');
+        }
+      },
+    );
+  }
+
+  /// STOMP 연결
+  static void connect(String token, {
+    required VoidCallback onConnect,
+    void Function(dynamic)? onError,
+  }) {
+    debugPrint('🔌 STOMP 연결 시작...');
+    
+    // 이미 연결된 경우 처리
+    if (_stompClient?.isActive ?? false) {
+      debugPrint('ℹ️ 이미 STOMP에 연결되어 있습니다.');
+      onConnect();
+      return;
+    }
+
+    // 연결이 끊어진 경우 재연결
+    if (_stompClient != null) {
+      debugPrint('🔄 STOMP 재연결 시도...');
+      _reconnect();
+      return;
+    }
+
+    final wsUrl = Uri.parse(ApiConstants.wsEndpoint).replace(scheme: 'ws');
+    debugPrint('🌐 WebSocket URL: $wsUrl');
+
+    _stompClient = StompClient(
+      config: StompConfig.SockJS(
+        url: wsUrl.toString(),
+        onConnect: (frame) {
+          debugPrint('✅ STOMP 연결 성공');
+          onConnect();
         },
-        onWebSocketError: (dynamic error) {
-          print('❌ WebSocket 오류: $error');
+        onDisconnect: (frame) {
+          debugPrint('❌ STOMP 연결 해제됨');
         },
-        onDisconnect: (StompFrame frame) {
-          _connected = false;
-          print('🔌 STOMP/WebSocket 연결 종료');
+        onError: (frame) {
+          debugPrint('❌ STOMP 에러 발생: ${frame?.body}');
+          if (onError != null) onError(frame?.body);
         },
-        onStompError: (StompFrame frame) {
-          print('⚠️ STOMP 오류: ${frame.body}');
+        onWebSocketError: (error) {
+          debugPrint('❌ WebSocket 에러 발생: $error');
+          if (onError != null) onError(error);
         },
-        // 적절히 heartbeat 설정 (10초마다)
-        heartbeatOutgoing: const Duration(seconds: 10),
-        heartbeatIncoming: const Duration(seconds: 10),
+        webSocketConnectHeaders: {
+          'Authorization': 'Bearer $token',
+        },
       ),
     );
-    _client!.activate();
+
+    try {
+      _stompClient?.activate();
+    } catch (e) {
+      debugPrint('❌ STOMP 활성화 실패: $e');
+      if (onError != null) onError(e);
+    }
+  }
+
+  /// 연결 재시도
+  static void _reconnect() {
+    debugPrint('🔄 STOMP 연결 재시도 중...');
+    _stompClient?.deactivate();
+    _stompClient = null;
+    // 잠시 대기 후 재연결
+    Future.delayed(const Duration(seconds: 1), () {
+      debugPrint('🔄 STOMP 재연결 시도...');
+      _stompClient?.activate();
+    });
   }
 
   /// 파티 외부 사용자용 브로드캐스트(파티 리스트 업데이트) 구독
   ///
   /// 메시지 예시:
   ///   { "partyId":2, "message":"파티 id: 2가 생성되었습니다.", "eventType":"PARTY_CREATE" }
-  static void subscribePublicUpdates({
+  static void subscribePublicUpdatesOld({
     required void Function(Map<String, dynamic> message) onMessage,
   }) {
-    if (!_connected || _client == null) {
+    if (!_connected || _stompClient == null) {
       print('⚠️ subscribePublicUpdates: STOMP 클라이언트가 연결되지 않았습니다.');
       return;
     }
-    _client!.subscribe(
+    _stompClient!.subscribe(
       destination: '/topic/parties/public-updates',
       callback: (StompFrame frame) {
         if (frame.body != null) {
@@ -100,12 +167,12 @@ class SocketService {
     required int partyId,
     required void Function(Map<String, dynamic> message) onMessage,
   }) {
-    if (!_connected || _client == null) {
+    if (!_connected || _stompClient == null) {
       print('⚠️ subscribePartyMembers: STOMP 클라이언트가 연결되지 않았습니다.');
       return;
     }
     final destination = '/topic/party/$partyId/members';
-    _client!.subscribe(
+    _stompClient!.subscribe(
       destination: destination,
       callback: (StompFrame frame) {
         if (frame.body != null) {
@@ -130,11 +197,11 @@ class SocketService {
   static void subscribeJoinRequestResponse({
     required void Function(Map<String, dynamic> message) onMessage,
   }) {
-    if (!_connected || _client == null) {
+    if (!_connected || _stompClient == null) {
       print('⚠️ subscribeJoinRequestResponse: STOMP 클라이언트가 연결되지 않았습니다.');
       return;
     }
-    _client!.subscribe(
+    _stompClient!.subscribe(
       destination: '/user/queue/join-request-response',
       callback: (StompFrame frame) {
         if (frame.body != null) {
@@ -150,7 +217,7 @@ class SocketService {
 
   /// 연결 종료
   static void disconnect() {
-    _client?.deactivate();
+    _stompClient?.deactivate();
     _connected = false;
     print('🔌 STOMP(WebSocket) 연결 해제');
   }
