@@ -89,6 +89,9 @@ flutter:
     - assets/app_wide_logo.png
     - assets/kakao_map.html
     - .env
+    - assets/icons/marker_1.png
+    - assets/icons/marker_2.png
+    - assets/icons/marker_3.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

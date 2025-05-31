@@ -37,6 +37,11 @@ class AuthService {
     await _storage.deleteTokens();
     GoogleSignIn().signOut();
 
+  Future<void> logout() async {
+    // 예: 토큰 제거 등 처리 (flutter_secure_storage 사용 시 삭제 필요)
+    print('로그아웃 처리 완료');
+  }
+
     // 로그인 화면으로 이동
     navigatorKey.currentState?.pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => LoginScreen()),

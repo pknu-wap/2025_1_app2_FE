@@ -5,7 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:app2_client/screens/destination_map_screen.dart';
 import 'package:app2_client/screens/start_map_screen.dart';
-import 'my_page_popup.dart';
+import 'package:app2_client/screens//my_page_popup.dart';
 
 class DestinationSelectScreen extends StatefulWidget {
   const DestinationSelectScreen({Key? key}) : super(key: key);
@@ -22,8 +22,8 @@ class _DestinationSelectScreenState extends State<DestinationSelectScreen> {
 
   Future<void> _selectStartFromMap() async {
     final result = await Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const StartMapScreen()),
+      context,
+      MaterialPageRoute(builder: (_) => const StartMapScreen()),
     );
 
     if (result != null && result is Map) {
@@ -98,7 +98,7 @@ class _DestinationSelectScreenState extends State<DestinationSelectScreen> {
             iconSize: 50.0,
             color: Colors.black38,
             onPressed: () {
-              MyPagePopup.show(context); // 호출만 하면 됨
+              MyPagePopup.show(context);
             },
           ),
         ],

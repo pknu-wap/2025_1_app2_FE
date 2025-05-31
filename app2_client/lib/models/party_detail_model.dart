@@ -4,6 +4,7 @@ class PartyMember {
   final String email;
   final String gender;
   final String role;
+  final String additionalRole; // ✅ 추가 필드
 
   PartyMember({
     required this.id,
@@ -11,6 +12,7 @@ class PartyMember {
     required this.email,
     required this.gender,
     required this.role,
+    required this.additionalRole, //✅ 추가
   });
 
   factory PartyMember.fromJson(Map<String, dynamic> json) {
@@ -20,6 +22,7 @@ class PartyMember {
       email: json['email'],
       gender: json['gender'],
       role: json['role'],
+      additionalRole: json['additional_role'] ?? 'NONE', // ✅ 파싱 추가
     );
   }
 }
