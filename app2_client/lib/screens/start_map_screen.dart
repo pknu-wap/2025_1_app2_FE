@@ -29,7 +29,8 @@ class _StartMapScreenState extends State<StartMapScreen> {
       LocationPermission perm = await Geolocator.checkPermission();
       if (perm == LocationPermission.denied) {
         perm = await Geolocator.requestPermission();
-        if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
+        if (perm == LocationPermission.denied ||
+            perm == LocationPermission.deniedForever) {
           throw Exception('위치 권한이 없습니다.');
         }
       }
@@ -58,13 +59,13 @@ class _StartMapScreenState extends State<StartMapScreen> {
       ..loadHtmlString(html, baseUrl: 'about:blank');
 
     setState(() => _controller = controller);
-    print('[DEBUG] KAKAO_HTML:\n$html');
   }
 
   Future<void> _onConfirmPressed() async {
     if (_controller == null) return;
     try {
-      final raw = await _controller!.runJavaScriptReturningResult('getSelectedDestination()');
+      final raw =
+      await _controller!.runJavaScriptReturningResult('getSelectedDestination()');
       dynamic result = raw;
       final first = result is String ? jsonDecode(result) : result;
       final decoded = first is String ? jsonDecode(first) : first;
