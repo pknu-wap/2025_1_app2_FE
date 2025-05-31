@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <title>파티 지도 보기</title>
+</head>
+<body>
+<div id="map" style="width:100%; height:100vh;"></div>
+
+<!-- Kakao Maps SDK (libraries=services) -->
+<script
+        src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={{KAKAO_JS_KEY}}&libraries=services">
+</script>
+
+<script>
+    let map;
+    // Flutter 쪽에서 중심 좌표(LAT, LNG)를 치환해서 넣어 줘야 합니다.
+    let centerLat = {{CENTER_LAT}};
+    let centerLng = {{CENTER_LNG}};
+
+    // 마커들을 관리하기 위한 객체
+    const markers = {};
+
+    window.onload = function () {
+      const container = document.getElementById('map');
+      const options = {
+        center: new kakao.maps.LatLng(centerLat, centerLng),
+        level: 4
+      };
+      map = new kakao.maps.Map(container, options);
+    };
+
+    // Flutter에서 호출: 마커 추가
+    // id: String, lat: Number, lng: Number, title: String, color: "blue"/"red"/"green" 등
+    window.addMarker = function (id, lat, lng, title, color) {
+      // 이미 같은 id의 마커가 있으면 제거
+      if (markers[id]) {
+        markers[id].setMap(null);
+        delete markers[id];
+      }
+
+      const position = new kakao.maps.LatLng(lat, lng);
+      // 컬러별 이미지 URL 설정 (기본 제공 마커 이미지를 대체)
+      let imageUrl;
+      switch (color) {
+        case 'red':
+          imageUrl = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png';
+          break;
+        case 'green':
+          imageUrl = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_green.png';
+          break;
+        case 'blue':
+        default:
+          imageUrl = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_blue.png';
+      }
+      const imageSize = new kakao.maps.Size(36, 54);
+      const imageOption = { offset: new kakao.maps.Point(18, 54) };
+
+      const markerImage = new kakao.maps.MarkerImage(imageUrl, imageSize, imageOption);
+      const marker = new kakao.maps.Marker({
+        map: map,
+        position: position,
+        title: title,
+        image: markerImage
+      });
+
+      // 마커 클릭 시 Flutter로 메시지 전달(필요할 때만 사용)
+      kakao.maps.event.addListener(marker, 'click', function () {
+        // 예: Flutter 쪽에서 `onMarkerClick` 핸들러를 정의해 두면, 호출해 줄 수 있습니다.
+        if (window.flutter_inappwebview) {
+          window.flutter_inappwebview.callHandler('onMarkerClick', id);
+        }
+      });
+
+      markers[id] = marker;
+    };
+
+    // Flutter에서 호출: 특정 id의 마커를 제거
+    window.removeMarker = function (id) {
+      if (markers[id]) {
+        markers[id].setMap(null);
+        delete markers[id];
+      }
+    };
+
+    // Flutter에서 호출: 지도 중심을 재설정
+    window.setCenter = function (lat, lng) {
+      if (!map) return;
+      const centerPos = new kakao.maps.LatLng(lat, lng);
+      map.setCenter(centerPos);
+    };
+</script>
+</body>
+</html>
