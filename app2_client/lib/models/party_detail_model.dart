@@ -1,28 +1,6 @@
-class PartyMember {
-  final int id;
-  final String name;
-  final String email;
-  final String gender;
-  final String role;
+// lib/models/party_detail_model.dart
 
-  PartyMember({
-    required this.id,
-    required this.name,
-    required this.email,
-    required this.gender,
-    required this.role,
-  });
-
-  factory PartyMember.fromJson(Map<String, dynamic> json) {
-    return PartyMember(
-      id: json['id'],
-      name: json['name'],
-      email: json['email'],
-      gender: json['gender'],
-      role: json['role'],
-    );
-  }
-}
+import 'party_member_model.dart';
 
 class PartyDetail {
   final int partyId;
@@ -50,17 +28,17 @@ class PartyDetail {
         json['party_destination']?['location']?['address'] ?? '도착지 정보 없음';
 
     final memberList = (json['party_members'] as List<dynamic>?)
-        ?.map((m) => PartyMember.fromJson(m))
+        ?.map((m) => PartyMember.fromJson(m as Map<String, dynamic>))
         .toList() ??
         [];
 
     return PartyDetail(
-      partyId: json['party_id'],
+      partyId: json['party_id'] as int,
       originAddress: originAddress,
       destAddress: destAddress,
       radius: (json['party_radius'] as num).toDouble(),
-      maxPerson: json['party_max_people'],
-      partyOption: json['party_option'],
+      maxPerson: json['party_max_people'] as int,
+      partyOption: json['party_option'] as String,
       members: memberList,
     );
   }
