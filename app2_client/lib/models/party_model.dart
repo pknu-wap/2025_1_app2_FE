@@ -26,17 +26,26 @@ class PartyModel {
   });
 
   factory PartyModel.fromJson(Map<String, dynamic> json) {
+    // party_members에서 첫 번째 멤버의 이름을 creatorName으로 사용
+    final members = json['party_members'] as List?;
+    final creatorName = (members != null && members.isNotEmpty)
+        ? (members[0]['name'] as String? ?? '')
+        : '';
+    // 출발지/도착지 정보 추출
+    final stopovers = json['party_stopovers'] as List? ?? [];
+    final start = stopovers.firstWhere((e) => e['stopover_type'] == 'START', orElse: () => null);
+    final dest = stopovers.firstWhere((e) => e['stopover_type'] == 'DESTINATION', orElse: () => null);
     return PartyModel(
-      id: json['id'] as String,
-      creatorName: json['creatorName'] as String,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      remainingSeats: json['remainingSeats'] as int,
-      originAddress: json['originAddress'] as String,
-      destAddress: json['destAddress'] as String,
-      originLat: (json['originLat'] as num).toDouble(),
-      originLng: (json['originLng'] as num).toDouble(),
-      destLat: (json['destLat'] as num).toDouble(),
-      destLng: (json['destLng'] as num).toDouble(),
+      id: json['party_id'].toString(),
+      creatorName: creatorName,
+      createdAt: DateTime.now(), // 서버에서 createdAt이 없으므로 임시로 현재 시간
+      remainingSeats: (json['party_max_people'] as int) - (json['party_current_people'] as int),
+      originAddress: start != null ? start['location']['address'] as String : '',
+      destAddress: dest != null ? dest['location']['address'] as String : '',
+      originLat: start != null ? (start['location']['lat'] as num).toDouble() : 0.0,
+      originLng: start != null ? (start['location']['lng'] as num).toDouble() : 0.0,
+      destLat: dest != null ? (dest['location']['lat'] as num).toDouble() : 0.0,
+      destLng: dest != null ? (dest['location']['lng'] as num).toDouble() : 0.0,
     );
   }
 
