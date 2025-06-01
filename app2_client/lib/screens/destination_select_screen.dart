@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:app2_client/screens/destination_map_screen.dart';
 import 'package:app2_client/screens/start_map_screen.dart';
+import 'my_page_popup.dart';
 
 class DestinationSelectScreen extends StatefulWidget {
   const DestinationSelectScreen({Key? key}) : super(key: key);
@@ -91,6 +92,16 @@ class _DestinationSelectScreenState extends State<DestinationSelectScreen> {
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.account_circle),
+            iconSize: 50.0,
+            color: Colors.black38,
+            onPressed: () {
+              MyPagePopup.show(context); // 호출만 하면 됨
+            },
+          ),
+        ],
       ),
       backgroundColor: Colors.white,
       body: Padding(

@@ -7,6 +7,8 @@ import 'firebase_options.dart';
 import 'package:app2_client/providers/auth_provider.dart';
 import 'package:app2_client/app.dart';
 
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env');

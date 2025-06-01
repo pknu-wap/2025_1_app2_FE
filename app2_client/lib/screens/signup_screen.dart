@@ -4,15 +4,18 @@ import 'package:app2_client/services/auth_service.dart';
 import 'package:app2_client/screens/destination_select_screen.dart';
 import 'package:app2_client/widgets/phone_number_formatter.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SignupScreen extends StatefulWidget {
-  final String idToken, accessToken, name, email;
+  final String session, idToken, accessToken, name, email, phone;
   const SignupScreen({
     super.key,
+    required this.session,
     required this.idToken,
     required this.accessToken,
     required this.name,
     required this.email,
+    required this.phone
   });
   @override
   State<SignupScreen> createState() => _SignupScreenState();
@@ -27,15 +30,22 @@ class _SignupScreenState extends State<SignupScreen> {
     _form.currentState!.save();
 
     final resp = await AuthService().registerOnServer(
+      session: widget.session,
       idToken: widget.idToken,
       accessToken: widget.accessToken,
       name: widget.name,
-      phone: _phone,
+      phone: widget.phone,
       age: 20, //현재 나이 필드에대한 가이드 존재 X, 따라서 하드코딩
       gender: _gender,
     );
 
     if (resp != null) {
+      // ✅ accessToken 저장
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('accessToken', widget.accessToken);
+
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('회원가입 완료!')),
       );
@@ -43,7 +53,8 @@ class _SignupScreenState extends State<SignupScreen> {
         context,
         MaterialPageRoute(builder: (_) => const DestinationSelectScreen()),
       );
-    } else {
+    }
+    else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('회원가입 실패')),
       );
@@ -146,7 +157,9 @@ class _SignupScreenState extends State<SignupScreen> {
                 Text('전화번호'),
                 SizedBox(height: 8),
                 TextFormField(
+                  initialValue: widget.phone,
                   keyboardType: TextInputType.phone,
+                  readOnly: true,
                   inputFormatters: [
                     LengthLimitingTextInputFormatter(13), // 하이픈 포함 시 최대 13자
                     FilteringTextInputFormatter.digitsOnly,
