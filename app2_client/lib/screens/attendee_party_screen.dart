@@ -6,6 +6,7 @@ import 'package:app2_client/services/party_service.dart';
 import 'package:app2_client/services/socket_service.dart';
 import 'package:provider/provider.dart';
 import 'package:app2_client/providers/auth_provider.dart';
+import 'package:app2_client/screens/chat_room_screen.dart';
 
 class AttendeePartyScreen extends StatefulWidget {
   final String partyId;
@@ -34,13 +35,11 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
   }
 
   void _connectAndSubscribe() {
-    // 1) AuthProvider에서 토큰을 가져와 STOMP에 연결
     final token =
         Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
     if (token == null) return;
 
     SocketService.connect(token, onConnect: () {
-      // 2) 화면 전용 토픽 구독: “파티 내부 사용자용” 멤버 업데이트
       if (!_subscribed) {
         SocketService.subscribePartyMembers(
           partyId: int.parse(widget.partyId),
@@ -73,7 +72,6 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
 
   @override
   void dispose() {
-    // 화면을 벗어나면 STOMP 연결 해제
     SocketService.disconnect();
     super.dispose();
   }
@@ -111,20 +109,24 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
               title: Text(m.name),
               subtitle: Text('${m.email} (${m.role})'),
             )),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  // TODO: 실제 채팅방으로 이동 로직을 여기에 추가
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue[900]),
-                child: const Text('파티 채팅방 가기'),
-              ),
-            ),
           ],
         ),
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ChatRoomScreen(
+                roomId: widget.partyId,
+              ),
+            ),
+          );
+        },
+        backgroundColor: Colors.amber,
+        child: const Icon(Icons.chat, color: Colors.black87),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 }

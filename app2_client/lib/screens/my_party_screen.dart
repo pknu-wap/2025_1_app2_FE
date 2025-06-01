@@ -701,7 +701,9 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ChatRoomScreen(roomId: _party.partyId.toString()),
+              builder: (context) => ChatRoomScreen(
+                roomId: widget.party.partyId.toString(),
+              ),
             ),
           );
         },
