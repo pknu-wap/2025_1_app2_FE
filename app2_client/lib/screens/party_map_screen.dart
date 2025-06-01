@@ -62,7 +62,9 @@ class _PartyMapScreenState extends State<PartyMapScreen> {
       if (!_subscribed) {
         SocketService.subscribePublicUpdates(onMessage: (message) {
           // 파티 생성/업데이트 이벤트가 오면, 리스트를 다시 가져와서 지도 갱신
-          _loadPots();
+          if (mounted) {
+            _loadPots();
+          }
         });
         _subscribed = true;
       }
@@ -71,16 +73,19 @@ class _PartyMapScreenState extends State<PartyMapScreen> {
 
   @override
   void dispose() {
+    // 소켓 연결 정리 및 구독 해제
+    SocketService.disconnect();
+    _subscribed = false;
     super.dispose();
   }
 
   /// WebView 초기화 및 HTML 로드
   Future<void> _initWebView() async {
-    final raw = await rootBundle.loadString('assets/kakao_map.html');
+    final raw = await rootBundle.loadString('assets/kakao_party_map.html');
     final html = raw
         .replaceAll('{{KAKAO_JS_KEY}}', dotenv.env['KAKAO_JS_KEY'] ?? '')
-        .replaceAll('{{LAT}}', widget.initialLat.toString())
-        .replaceAll('{{LNG}}', widget.initialLng.toString());
+        .replaceAll('{{CENTER_LAT}}', widget.initialLat.toString())
+        .replaceAll('{{CENTER_LNG}}', widget.initialLng.toString());
 
     final wc = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -117,8 +122,8 @@ class _PartyMapScreenState extends State<PartyMapScreen> {
         map: map,
         image: new kakao.maps.MarkerImage(
           'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png',
-          new kakao.maps.Size(48,68),
-          { offset: new kakao.maps.Point(24,68) }
+          new kakao.maps.Size(64, 69),
+          { offset: new kakao.maps.Point(27, 69) }
         )
       });
       new kakao.maps.CustomOverlay({
@@ -140,15 +145,19 @@ class _PartyMapScreenState extends State<PartyMapScreen> {
 
   /// 서버에서 파티 목록을 가져와 _pots 업데이트 (토큰 포함)
   Future<void> _loadPots() async {
+    if (!mounted) return;
+    
     final token =
         Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
     if (token == null) {
       // 토큰이 없으면 빈 리스트로 초기화
-      setState(() => _pots = []);
+      if (mounted) {
+        setState(() => _pots = []);
+      }
       return;
     }
 
-    // 지구 전체 범위의 반경을 주어 “모든 파티”를 가져오도록 설정
+    // 지구 전체 범위의 반경을 주어 "모든 파티"를 가져오도록 설정
     const extremelyLargeRadius = 20000.0; // 약 20,000km
     try {
       final list = await PartyService.fetchNearbyParties(
@@ -158,11 +167,13 @@ class _PartyMapScreenState extends State<PartyMapScreen> {
         accessToken: token, // ← 반드시 토큰을 넘겨야 함
       );
       debugPrint('▶️ fetchNearbyParties 응답: 파티 개수 = ${list.length}');
-      setState(() {
-        _pots = list;
-      });
-      if (_pageLoaded) {
-        _renderMarkers();
+      if (mounted) {
+        setState(() {
+          _pots = list;
+        });
+        if (_pageLoaded) {
+          _renderMarkers();
+        }
       }
     } catch (e) {
       debugPrint('‼️ fetchNearbyParties 예외 발생: $e');
@@ -172,9 +183,9 @@ class _PartyMapScreenState extends State<PartyMapScreen> {
   /// _pots에 담긴 파티들을 지도 위에 마커로 찍어주는 메서드
   void _renderMarkers() {
     for (final p in _pots) {
-      _controller?.runJavaScript(
-        'addMarker("${p.id}", ${p.destLat}, ${p.destLng}, "${p.creatorName}");',
-      );
+      final js = 'addMarker("${p.id}", ${p.destLat}, ${p.destLng}, "${p.creatorName}", "blue");';
+      debugPrint('실행 JS: $js');
+      _controller?.runJavaScript(js);
     }
   }
 

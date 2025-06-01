@@ -15,8 +15,9 @@
 <script>
     let map;
     // Flutter 쪽에서 중심 좌표(LAT, LNG)를 치환해서 넣어 줘야 합니다.
-    let centerLat = {{CENTER_LAT}};
-    let centerLng = {{CENTER_LNG}};
+    let centerLat = parseFloat('{{CENTER_LAT}}');
+    let centerLng = parseFloat('{{CENTER_LNG}}');
+    console.log('지도 중심 좌표:', centerLat, centerLng);
 
     // 마커들을 관리하기 위한 객체
     const markers = {};
@@ -33,6 +34,10 @@
     // Flutter에서 호출: 마커 추가
     // id: String, lat: Number, lng: Number, title: String, color: "blue"/"red"/"green" 등
     window.addMarker = function (id, lat, lng, title, color) {
+      if (!map) {
+        alert('지도(map)가 아직 초기화되지 않았습니다!');
+        return;
+      }
       // 이미 같은 id의 마커가 있으면 제거
       if (markers[id]) {
         markers[id].setMap(null);
@@ -40,21 +45,11 @@
       }
 
       const position = new kakao.maps.LatLng(lat, lng);
-      // 컬러별 이미지 URL 설정 (기본 제공 마커 이미지를 대체)
-      let imageUrl;
-      switch (color) {
-        case 'red':
-          imageUrl = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png';
-          break;
-        case 'green':
-          imageUrl = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_green.png';
-          break;
-        case 'blue':
-        default:
-          imageUrl = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_blue.png';
-      }
-      const imageSize = new kakao.maps.Size(36, 54);
-      const imageOption = { offset: new kakao.maps.Point(18, 54) };
+      
+      // 카카오 기본 빨간 마커로 통일
+      const imageUrl = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png';
+      const imageSize = new kakao.maps.Size(64, 69);
+      const imageOption = { offset: new kakao.maps.Point(27, 69) };
 
       const markerImage = new kakao.maps.MarkerImage(imageUrl, imageSize, imageOption);
       const marker = new kakao.maps.Marker({
@@ -64,15 +59,15 @@
         image: markerImage
       });
 
-      // 마커 클릭 시 Flutter로 메시지 전달(필요할 때만 사용)
+      // 마커 클릭 시 Flutter로 메시지 전달(webview_flutter용)
       kakao.maps.event.addListener(marker, 'click', function () {
-        // 예: Flutter 쪽에서 `onMarkerClick` 핸들러를 정의해 두면, 호출해 줄 수 있습니다.
-        if (window.flutter_inappwebview) {
-          window.flutter_inappwebview.callHandler('onMarkerClick', id);
+        if (window.MarkerClick) {
+          window.MarkerClick.postMessage(JSON.stringify({ id: id }));
         }
       });
 
       markers[id] = marker;
+      console.log('마커 추가:', id, lat, lng, title, color);
     };
 
     // Flutter에서 호출: 특정 id의 마커를 제거
