@@ -62,7 +62,9 @@ class _PartyMapScreenState extends State<PartyMapScreen> {
       if (!_subscribed) {
         SocketService.subscribePublicUpdates(onMessage: (message) {
           // 파티 생성/업데이트 이벤트가 오면, 리스트를 다시 가져와서 지도 갱신
-          _loadPots();
+          if (mounted) {
+            _loadPots();
+          }
         });
         _subscribed = true;
       }
@@ -71,6 +73,9 @@ class _PartyMapScreenState extends State<PartyMapScreen> {
 
   @override
   void dispose() {
+    // 소켓 연결 정리 및 구독 해제
+    SocketService.disconnect();
+    _subscribed = false;
     super.dispose();
   }
 
@@ -117,8 +122,8 @@ class _PartyMapScreenState extends State<PartyMapScreen> {
         map: map,
         image: new kakao.maps.MarkerImage(
           'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png',
-          new kakao.maps.Size(48,68),
-          { offset: new kakao.maps.Point(24,68) }
+          new kakao.maps.Size(64, 69),
+          { offset: new kakao.maps.Point(27, 69) }
         )
       });
       new kakao.maps.CustomOverlay({
@@ -140,11 +145,15 @@ class _PartyMapScreenState extends State<PartyMapScreen> {
 
   /// 서버에서 파티 목록을 가져와 _pots 업데이트 (토큰 포함)
   Future<void> _loadPots() async {
+    if (!mounted) return;
+    
     final token =
         Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
     if (token == null) {
       // 토큰이 없으면 빈 리스트로 초기화
-      setState(() => _pots = []);
+      if (mounted) {
+        setState(() => _pots = []);
+      }
       return;
     }
 
@@ -158,11 +167,13 @@ class _PartyMapScreenState extends State<PartyMapScreen> {
         accessToken: token, // ← 반드시 토큰을 넘겨야 함
       );
       debugPrint('▶️ fetchNearbyParties 응답: 파티 개수 = ${list.length}');
-      setState(() {
-        _pots = list;
-      });
-      if (_pageLoaded) {
-        _renderMarkers();
+      if (mounted) {
+        setState(() {
+          _pots = list;
+        });
+        if (_pageLoaded) {
+          _renderMarkers();
+        }
       }
     } catch (e) {
       debugPrint('‼️ fetchNearbyParties 예외 발생: $e');

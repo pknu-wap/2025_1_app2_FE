@@ -45,21 +45,11 @@
       }
 
       const position = new kakao.maps.LatLng(lat, lng);
-      // 컬러별 이미지 URL 설정 (기본 제공 마커 이미지를 대체)
-      let imageUrl;
-      switch (color) {
-        case 'red':
-          imageUrl = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png';
-          break;
-        case 'green':
-          imageUrl = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_green.png';
-          break;
-        case 'blue':
-        default:
-          imageUrl = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_blue.png';
-      }
-      const imageSize = new kakao.maps.Size(64, 96);
-      const imageOption = { offset: new kakao.maps.Point(32, 96) };
+      
+      // 카카오 기본 빨간 마커로 통일
+      const imageUrl = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png';
+      const imageSize = new kakao.maps.Size(64, 69);
+      const imageOption = { offset: new kakao.maps.Point(27, 69) };
 
       const markerImage = new kakao.maps.MarkerImage(imageUrl, imageSize, imageOption);
       const marker = new kakao.maps.Marker({

@@ -80,4 +80,12 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  /// 로그아웃: 토큰/유저 상태 초기화 및 AuthService.logout 호출
+  Future<void> logout() async {
+    await _authService.logout();
+    _tokens = null;
+    _user = null;
+    notifyListeners();
+  }
 }
