@@ -282,12 +282,12 @@ class ChatBubble extends StatefulWidget {
 class _ChatBubbleState extends State<ChatBubble> {
   late String timeString;
   Timer? _timer;
+  bool isSelected = false;  // 메시지가 선택되었는지 여부
 
   @override
   void initState() {
     super.initState();
     timeString = _getTimeString();
-    // 1분마다 시간 갱신
     _timer = Timer.periodic(const Duration(minutes: 1), (timer) {
       if (mounted) {
         setState(() {
@@ -312,20 +312,49 @@ class _ChatBubbleState extends State<ChatBubble> {
     final messageTime = effectiveTimestamp.toDate();
     final now = DateTime.now();
     
-    // 오늘 날짜인 경우
     if (messageTime.year == now.year && 
         messageTime.month == now.month && 
         messageTime.day == now.day) {
       return DateFormat('a h:mm', 'ko_KR').format(messageTime);
     } 
-    // 올해인 경우
     else if (messageTime.year == now.year) {
       return DateFormat('M/d a h:mm', 'ko_KR').format(messageTime);
     }
-    // 작년 이전인 경우
     else {
       return DateFormat('y/M/d a h:mm', 'ko_KR').format(messageTime);
     }
+  }
+
+  void _showReportButton() {
+    if (!widget.isMine) {  // 자신의 메시지는 신고할 수 없음
+      setState(() {
+        isSelected = true;
+      });
+      // 3초 후 자동으로 선택 해제
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted) {
+          setState(() {
+            isSelected = false;
+          });
+        }
+      });
+    }
+  }
+
+  void _navigateToReportScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ReportScreen(
+          reportedUserName: widget.name,
+          messageContent: widget.message,
+          messageTimestamp: (widget.clientTimestamp ?? widget.timestamp)?.toDate(),
+        ),
+      ),
+    );
+    setState(() {
+      isSelected = false;  // 신고 화면으로 이동 후 선택 상태 해제
+    });
   }
 
   @override
@@ -341,26 +370,72 @@ class _ChatBubbleState extends State<ChatBubble> {
       children: [
         if (!widget.isMine)
           Text(widget.name, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-        Container(
-          margin: margin,
-          child: Column(
-            crossAxisAlignment: alignment,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: bubbleColor,
-                  borderRadius: BorderRadius.circular(16),
+        Stack(
+          children: [
+            Container(
+              margin: margin,
+              child: Column(
+                crossAxisAlignment: alignment,
+                children: [
+                  GestureDetector(
+                    onLongPress: _showReportButton,
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isSelected ? Colors.grey.shade400 : bubbleColor,
+                        borderRadius: BorderRadius.circular(16),
+                        border: isSelected ? Border.all(color: Colors.red, width: 2) : null,
+                      ),
+                      child: Text(widget.message),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    timeString,
+                    style: const TextStyle(fontSize: 10, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+            if (isSelected && !widget.isMine)
+              Positioned(
+                top: 0,
+                right: widget.isMine ? null : margin.right,
+                left: widget.isMine ? margin.left : null,
+                child: GestureDetector(
+                  onTap: _navigateToReportScreen,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.report_problem, color: Colors.white, size: 16),
+                        SizedBox(width: 4),
+                        Text(
+                          '신고하기',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                child: Text(widget.message),
               ),
-              const SizedBox(height: 2),
-              Text(
-                timeString,
-                style: const TextStyle(fontSize: 10, color: Colors.grey),
-              ),
-            ],
-          ),
+          ],
         ),
       ],
     );
