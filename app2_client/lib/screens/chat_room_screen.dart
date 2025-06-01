@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart'; // For JWT 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:app2_client/screens/report_screen.dart';
 import 'package:app2_client/services/secure_storage_service.dart';
@@ -25,16 +26,18 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   Map<String, String> userNames = {};  // userId to name mapping
   bool isUserInfoLoaded = false;  // 사용자 정보 로딩 상태 추가
 
-  String startAddress = '';
-  String destinationAddress = '';
-  bool isLoading = true;
-
   @override
   void initState() {
     super.initState();
     _getCurrentUser();
     _loadPartyMembers();
-    _loadRouteInfo();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _controller.dispose();
+    super.dispose();
   }
 
   Future<void> _getCurrentUser() async {
@@ -73,73 +76,27 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     }
   }
 
-  Future<String> loadJwtToken() async {
-    const storage = FlutterSecureStorage();
-    return await storage.read(key: 'jwt') ?? '';
-  }
-
-  Future<void> _loadRouteInfo() async {
+  Future<void> _sendMessage(String text) async {
+    if (!mounted) return;
+    
     try {
-      print('🔄 파티 정보 로딩 시작: ${widget.roomId}');
-      final storage = SecureStorageService();
-      final accessToken = await storage.getAccessToken();
-      
-      if (accessToken == null) {
-        print('❌ 액세스 토큰이 없습니다.');
-        return;
-      }
-
-      final response = await http.get(
-        Uri.parse('${dotenv.env['BACKEND_BASE_URL']}/api/party/${widget.roomId}'),
-        headers: {'Authorization': 'Bearer $accessToken'},
-      );
-
-      print('📡 API 응답: ${response.statusCode}');
-      print('📄 응답 데이터: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        print('✅ 파티 정보 파싱: $data');
-        
-        String? start, destination;
-        if (data is List) {
-          for (var item in data) {
-            final stopover = item['stopover'];
-            if (stopover != null) {
-              final type = stopover['stopover_type'];
-              final location = stopover['location'];
-              if (location != null) {
-                final address = location['address'];
-                if (type == 'START') {
-                  start = address;
-                } else if (type == 'DESTINATION') {
-                  destination = address;
-                }
-              }
-            }
-          }
-        }
-
-        setState(() {
-          startAddress = start ?? '알 수 없음';
-          destinationAddress = destination ?? '알 수 없음';
-          isLoading = false;
-        });
-        
-        print('✅ 주소 설정 완료');
-        print('   출발: $startAddress');
-        print('   도착: $destinationAddress');
-      } else {
-        print('❌ API 오류: ${response.statusCode}');
-        throw Exception('Failed to load route info');
-      }
-    } catch (e) {
-      print('❌ 파티 정보 로딩 실패: $e');
-      setState(() {
-        startAddress = '로딩 실패';
-        destinationAddress = '로딩 실패';
-        isLoading = false;
+      await FirebaseFirestore.instance
+          .collection('chat_rooms')
+          .doc(widget.roomId)
+          .collection('messages')
+          .add({
+        'text': text,
+        'senderId': currentUserId,
+        'senderName': currentUserName,
+        'timestamp': FieldValue.serverTimestamp(),
       });
+      _controller.clear();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('메시지 전송에 실패했습니다.')),
+        );
+      }
     }
   }
 
@@ -171,40 +128,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       ),
       body: Column(
         children: [
-          // 목적지 정보 박스
-          Container(
-            width: double.infinity,
-            margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black12,
-                  blurRadius: 4,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '$startAddress ➤ $destinationAddress',
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        '출발 예정 시간은 추후 확장 필요',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                    ],
-                  ),
-          ),
-
           // 채팅 메시지 영역 (Firestore 연동)
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
@@ -216,25 +139,45 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                   .snapshots(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
-                  return Center(child: CircularProgressIndicator());
+                  return const Center(child: CircularProgressIndicator());
                 }
+                
                 final messages = snapshot.data!.docs;
-                return ListView(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  children: messages.map((doc) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    final senderId = data['senderId'] ?? '';
-                    final senderName = data['senderName'] ?? userNames[senderId] ?? '알 수 없음';
-                    
-                    return ChatBubble(
-                      isMine: senderId == currentUserId,
-                      name: senderName,
-                      message: data['text'] ?? '',
-                      timestamp: data['timestamp'],
-                      senderId: senderId,
+                
+                // 새 메시지가 오면 자동으로 스크롤
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (_scrollController.hasClients) {
+                    _scrollController.animateTo(
+                      _scrollController.position.maxScrollExtent,
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOut,
                     );
-                  }).toList(),
+                  }
+                });
+                
+                return Scrollbar(
+                  thumbVisibility: true,  // 스크롤바 항상 표시
+                  thickness: 8.0,  // 스크롤바 두께
+                  radius: const Radius.circular(4),  // 스크롤바 모서리 둥글게
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    itemCount: messages.length,
+                    itemBuilder: (context, index) {
+                      final doc = messages[index];
+                      final data = doc.data() as Map<String, dynamic>;
+                      final senderId = data['senderId'] ?? '';
+                      final senderName = data['senderName'] ?? userNames[senderId] ?? '알 수 없음';
+                      
+                      return ChatBubble(
+                        isMine: senderId == currentUserId,
+                        name: senderName,
+                        message: data['text'] ?? '',
+                        timestamp: data['timestamp'],
+                        senderId: senderId,
+                      );
+                    },
+                  ),
                 );
               },
             ),
@@ -263,36 +206,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton(
-                  onPressed: !isUserInfoLoaded ? null : () async {
+                  onPressed: !isUserInfoLoaded ? null : () {
                     final text = _controller.text.trim();
                     if (text.isNotEmpty) {
-                      try {
-                        await FirebaseFirestore.instance
-                            .collection('chat_rooms')
-                            .doc(widget.roomId)
-                            .collection('messages')
-                            .add({
-                          'text': text,
-                          'senderId': currentUserId,
-                          'senderName': currentUserName,
-                          'timestamp': FieldValue.serverTimestamp(),
-                        });
-                        _controller.clear();
-                        
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (_scrollController.hasClients) {
-                            _scrollController.animateTo(
-                              _scrollController.position.maxScrollExtent,
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeOut,
-                            );
-                          }
-                        });
-                      } catch (e) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('메시지 전송에 실패했습니다.')),
-                        );
-                      }
+                      _sendMessage(text);
                     }
                   },
                   style: ElevatedButton.styleFrom(
@@ -335,6 +252,22 @@ class ChatBubble extends StatefulWidget {
 
 class _ChatBubbleState extends State<ChatBubble> {
   bool isSelected = false;
+  String timeString = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeTimeString();
+  }
+
+  Future<void> _initializeTimeString() async {
+    await initializeDateFormatting('ko_KR');
+    if (mounted && widget.timestamp != null) {
+      setState(() {
+        timeString = DateFormat('a h:mm', 'ko').format(widget.timestamp!.toDate());
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -343,10 +276,6 @@ class _ChatBubbleState extends State<ChatBubble> {
     final margin = widget.isMine
         ? const EdgeInsets.only(left: 80, top: 8, bottom: 8)
         : const EdgeInsets.only(right: 80, top: 8, bottom: 8);
-
-    final timeString = widget.timestamp != null
-        ? DateFormat('a h:mm', 'ko').format(widget.timestamp!.toDate())
-        : '';
 
     return Column(
       crossAxisAlignment: alignment,
