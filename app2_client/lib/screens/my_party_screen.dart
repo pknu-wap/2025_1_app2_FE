@@ -16,6 +16,7 @@ import 'package:app2_client/services/socket_service.dart';
 import 'package:app2_client/services/party_service.dart';
 import 'package:app2_client/models/join_request_model.dart';
 import 'package:app2_client/screens/stopover_setting_screen.dart';
+import 'package:app2_client/screens/chat_room_screen.dart';
 
 class MyPartyScreen extends StatefulWidget {
   final PartyDetail party;
@@ -67,7 +68,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
 
     SocketService.connect(token, onConnect: () {
       if (!_socketSubscribed) {
-        // 1) 호스트에게 날아오는 “참여 요청 응답” (PENDING, APPROVED, REJECTED, CANCELED)
+        // 1) 호스트에게 날아오는 "참여 요청 응답" (PENDING, APPROVED, REJECTED, CANCELED)
         SocketService.subscribeJoinRequestResponse(onMessage: (msg) {
           // msg 안에 type이 "JOIN_REQUEST"인 경우엔 새 요청 정보를 _joinRequests에 추가
           if (msg['type'] == 'JOIN_REQUEST') {
@@ -161,7 +162,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
         await _mapController!
             .runJavaScript('removeMarker("${stop.stopover.id}");');
       }
-      // 목적지(Host dest)는 ID를 “destination” 으로 고정
+      // 목적지(Host dest)는 ID를 "destination" 으로 고정
       await _mapController!.runJavaScript('removeMarker("destination");');
 
       // 2) Host 도착지(빨간색) 마커 찍기
@@ -225,7 +226,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
     }
   }
 
-  /// “경유지 추가” 다이얼로그 띄우고, 파티에 경유지 추가 요청 후 로컬 리스트와 마커 갱신, 추가된 경유지 설정 화면으로 이동
+  /// "경유지 추가" 다이얼로그 띄우고, 파티에 경유지 추가 요청 후 로컬 리스트와 마커 갱신, 추가된 경유지 설정 화면으로 이동
   Future<void> _addStopoverDialog() async {
     final token =
         Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
@@ -324,7 +325,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                     _stopoverList = newList;
                   });
 
-                  // 새로 추가된 경유지가 있으면 → “하차 지점 설정 화면”으로 바로 이동
+                  // 새로 추가된 경유지가 있으면 → "하차 지점 설정 화면"으로 바로 이동
                   if (newList.isNotEmpty) {
                     final added = newList.firstWhere(
                             (e) =>
@@ -362,7 +363,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
     );
   }
 
-  /// “경유지 수정” 다이얼로그 (MyPartyScreen 내에서도 호출 가능)
+  /// "경유지 수정" 다이얼로그 (MyPartyScreen 내에서도 호출 가능)
   Future<void> _updateStopoverDialog(StopoverResponse existing) async {
     final token =
         Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
@@ -570,7 +571,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
 
                   const SizedBox(height: 24),
 
-                  // “경유지 추가” 버튼
+                  // "경유지 추가" 버튼
                   Center(
                     child: ElevatedButton.icon(
                       icon: const Icon(Icons.add_road),
@@ -695,6 +696,19 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ChatRoomScreen(roomId: _party.partyId.toString()),
+            ),
+          );
+        },
+        backgroundColor: Colors.amber,
+        child: const Icon(Icons.chat, color: Colors.black87),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
