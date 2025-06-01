@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:app2_client/screens/report_screen.dart';
+import 'package:app2_client/services/secure_storage_service.dart';
 
 class ChatRoomScreen extends StatefulWidget {
   final String roomId;
@@ -21,6 +22,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   String? currentUserId;
   String? currentUserName;
   Map<String, String> userNames = {};  // userId to name mapping
+  bool isUserInfoLoaded = false;  // 사용자 정보 로딩 상태 추가
 
   String startAddress = '';
   String destinationAddress = '';
@@ -35,9 +37,19 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   }
 
   Future<void> _getCurrentUser() async {
-    const storage = FlutterSecureStorage();
-    currentUserId = await storage.read(key: 'userId');
-    currentUserName = await storage.read(key: 'userName');
+    final storage = SecureStorageService();
+    print('🔍 사용자 정보 로딩 시작');
+    
+    currentUserId = await storage.getUserId();
+    print('📱 userId: $currentUserId');
+    
+    currentUserName = await storage.getUserName();
+    print('📱 userName: $currentUserName');
+    
+    setState(() {
+      isUserInfoLoaded = currentUserId != null && currentUserName != null;
+      print('✅ 사용자 정보 로딩 완료: $isUserInfoLoaded');
+    });
   }
 
   Future<void> _loadPartyMembers() async {
@@ -185,7 +197,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                   children: messages.map((doc) {
                     final data = doc.data() as Map<String, dynamic>;
                     final senderId = data['senderId'] ?? '';
-                    final senderName = userNames[senderId] ?? '알 수 없음';
+                    final senderName = data['senderName'] ?? userNames[senderId] ?? '알 수 없음';
                     
                     return ChatBubble(
                       isMine: senderId == currentUserId,
@@ -210,7 +222,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                   child: TextField(
                     controller: _controller,
                     decoration: InputDecoration(
-                      hintText: '메시지를 입력하세요',
+                      hintText: isUserInfoLoaded ? '메시지를 입력하세요' : '사용자 정보를 불러오는 중...',
                       filled: true,
                       fillColor: Colors.white,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16),
@@ -223,7 +235,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton(
-                  onPressed: () async {
+                  onPressed: !isUserInfoLoaded ? null : () async {
                     final text = _controller.text.trim();
                     if (text.isNotEmpty) {
                       try {
@@ -234,7 +246,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                             .add({
                           'text': text,
                           'senderId': currentUserId,
-                          'senderName': currentUserName,  // 실제 사용자 이름 사용
+                          'senderName': currentUserName,
                           'timestamp': FieldValue.serverTimestamp(),
                         });
                         _controller.clear();
@@ -259,6 +271,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                     shape: const CircleBorder(),
                     padding: const EdgeInsets.all(12),
                     backgroundColor: Colors.indigo,
+                    disabledBackgroundColor: Colors.grey,
                   ),
                   child: const Icon(Icons.send, color: Colors.white),
                 ),

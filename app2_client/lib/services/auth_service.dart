@@ -44,6 +44,22 @@ class AuthService {
     );
   }
 
+  Future<void> saveUserInfo({
+    required String userId,
+    required String userName,
+  }) async {
+    print('📝 AuthService: 사용자 정보 저장 시작');
+    print('   ▶ userId: $userId');
+    print('   ▶ userName: $userName');
+    
+    await _storage.saveUserInfo(
+      userId: userId,
+      userName: userName,
+    );
+    
+    print('✅ AuthService: 사용자 정보 저장 완료');
+  }
+
   Future<UserModel?> loginWithGoogle() async {
     try {
       final googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
