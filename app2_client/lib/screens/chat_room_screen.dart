@@ -9,6 +9,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:app2_client/screens/report_screen.dart';
 import 'package:app2_client/services/secure_storage_service.dart';
 import 'package:app2_client/screens/my_page_popup.dart';  // 추가
+import 'dart:async';
 
 class ChatRoomScreen extends StatefulWidget {
   final String roomId;
@@ -29,6 +30,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   @override
   void initState() {
     super.initState();
+    initializeDateFormatting('ko_KR', null);  // 한국어 날짜 포맷 초기화
     _getCurrentUser();
     _loadPartyMembers();
   }
@@ -80,17 +82,38 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     if (!mounted) return;
     
     try {
-      await FirebaseFirestore.instance
+      final now = DateTime.now();
+      final message = {
+        'text': text,
+        'senderId': currentUserId,
+        'senderName': currentUserName,
+        'timestamp': now,  // 서버 타임스탬프 대신 현재 시간 사용
+        'clientTimestamp': now,  // 클라이언트 타임스탬프도 동일한 시간 사용
+      };
+
+      // 메시지 전송
+      final docRef = await FirebaseFirestore.instance
           .collection('chat_rooms')
           .doc(widget.roomId)
           .collection('messages')
           .add({
-        'text': text,
-        'senderId': currentUserId,
-        'senderName': currentUserName,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
+            'text': text,
+            'senderId': currentUserId,
+            'senderName': currentUserName,
+            'timestamp': FieldValue.serverTimestamp(),  // 서버 타임스탬프는 백그라운드에서 업데이트
+            'clientTimestamp': Timestamp.fromDate(now),  // 클라이언트 타임스탬프는 즉시 설정
+          });
+
       _controller.clear();
+      
+      // 스크롤을 즉시 아래로 이동
+      if (_scrollController.hasClients) {
+        await _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent + 100,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -128,14 +151,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       ),
       body: Column(
         children: [
-          // 채팅 메시지 영역 (Firestore 연동)
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('chat_rooms')
                   .doc(widget.roomId)
                   .collection('messages')
-                  .orderBy('timestamp')
+                  .orderBy('clientTimestamp', descending: false)
                   .snapshots(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
@@ -154,26 +176,31 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                     );
                   }
                 });
-                
+
                 return Scrollbar(
-                  thumbVisibility: true,  // 스크롤바 항상 표시
-                  thickness: 8.0,  // 스크롤바 두께
-                  radius: const Radius.circular(4),  // 스크롤바 모서리 둥글게
+                  controller: _scrollController,
+                  thickness: 8.0,
+                  radius: const Radius.circular(4),
+                  thumbVisibility: true,
                   child: ListView.builder(
                     controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                     itemCount: messages.length,
                     itemBuilder: (context, index) {
                       final doc = messages[index];
                       final data = doc.data() as Map<String, dynamic>;
                       final senderId = data['senderId'] ?? '';
                       final senderName = data['senderName'] ?? userNames[senderId] ?? '알 수 없음';
+                      final timestamp = data['timestamp'] as Timestamp?;
+                      final clientTimestamp = data['clientTimestamp'] as Timestamp?;
                       
                       return ChatBubble(
+                        key: ValueKey('${doc.id}_${clientTimestamp?.millisecondsSinceEpoch}'),
                         isMine: senderId == currentUserId,
                         name: senderName,
                         message: data['text'] ?? '',
-                        timestamp: data['timestamp'],
+                        timestamp: timestamp is Timestamp ? timestamp : (clientTimestamp ?? Timestamp.now()),
+                        clientTimestamp: clientTimestamp ?? Timestamp.now(),
                         senderId: senderId,
                       );
                     },
@@ -235,6 +262,7 @@ class ChatBubble extends StatefulWidget {
   final String name;
   final String message;
   final Timestamp? timestamp;
+  final Timestamp? clientTimestamp;
   final String senderId;
 
   const ChatBubble({
@@ -243,6 +271,7 @@ class ChatBubble extends StatefulWidget {
     required this.name,
     required this.message,
     required this.timestamp,
+    required this.clientTimestamp,
     required this.senderId,
   });
 
@@ -251,21 +280,51 @@ class ChatBubble extends StatefulWidget {
 }
 
 class _ChatBubbleState extends State<ChatBubble> {
-  bool isSelected = false;
-  String timeString = '';
+  late String timeString;
+  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
-    _initializeTimeString();
+    timeString = _getTimeString();
+    // 1분마다 시간 갱신
+    _timer = Timer.periodic(const Duration(minutes: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          timeString = _getTimeString();
+        });
+      }
+    });
   }
 
-  Future<void> _initializeTimeString() async {
-    await initializeDateFormatting('ko_KR');
-    if (mounted && widget.timestamp != null) {
-      setState(() {
-        timeString = DateFormat('a h:mm', 'ko').format(widget.timestamp!.toDate());
-      });
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  String _getTimeString() {
+    final effectiveTimestamp = widget.clientTimestamp ?? widget.timestamp;
+    if (effectiveTimestamp == null) {
+      return '';
+    }
+
+    final messageTime = effectiveTimestamp.toDate();
+    final now = DateTime.now();
+    
+    // 오늘 날짜인 경우
+    if (messageTime.year == now.year && 
+        messageTime.month == now.month && 
+        messageTime.day == now.day) {
+      return DateFormat('a h:mm', 'ko_KR').format(messageTime);
+    } 
+    // 올해인 경우
+    else if (messageTime.year == now.year) {
+      return DateFormat('M/d a h:mm', 'ko_KR').format(messageTime);
+    }
+    // 작년 이전인 경우
+    else {
+      return DateFormat('y/M/d a h:mm', 'ko_KR').format(messageTime);
     }
   }
 
@@ -282,90 +341,27 @@ class _ChatBubbleState extends State<ChatBubble> {
       children: [
         if (!widget.isMine)
           Text(widget.name, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-        Stack(
-          children: [
-            GestureDetector(
-              onLongPress: () {
-                if (!widget.isMine) {  // 자신의 메시지는 신고할 수 없음
-                  setState(() {
-                    isSelected = true;
-                  });
-                  // 3초 후 자동으로 선택 해제
-                  Future.delayed(const Duration(seconds: 3), () {
-                    if (mounted) {
-                      setState(() {
-                        isSelected = false;
-                      });
-                    }
-                  });
-                }
-              },
-              child: Container(
-                margin: margin,
+        Container(
+          margin: margin,
+          child: Column(
+            crossAxisAlignment: alignment,
+            children: [
+              Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: isSelected ? Colors.grey.shade400 : bubbleColor,
+                  color: bubbleColor,
                   borderRadius: BorderRadius.circular(16),
-                  border: isSelected ? Border.all(color: Colors.red, width: 2) : null,
                 ),
                 child: Text(widget.message),
               ),
-            ),
-            if (isSelected && !widget.isMine)
-              Positioned(
-                top: -5,
-                right: widget.isMine ? null : 85,
-                left: widget.isMine ? 85 : null,
-                child: GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ReportScreen(
-                          reportedUserName: widget.name,
-                          messageContent: widget.message,
-                          messageTimestamp: widget.timestamp?.toDate(),
-                        ),
-                      ),
-                    );
-                    setState(() {
-                      isSelected = false;
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.report_problem, color: Colors.white, size: 16),
-                        SizedBox(width: 4),
-                        Text(
-                          '신고하기',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+              const SizedBox(height: 2),
+              Text(
+                timeString,
+                style: const TextStyle(fontSize: 10, color: Colors.grey),
               ),
-          ],
+            ],
+          ),
         ),
-        Text(timeString, style: const TextStyle(fontSize: 10, color: Colors.grey)),
       ],
     );
   }
