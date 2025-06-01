@@ -2,7 +2,7 @@ import 'package:app2_client/constants/api_constants.dart';
 import 'package:app2_client/services/dio_client.dart';
 
 class ProfileService {
-  // 프로필 정보를 요청
+  /// 내 프로필 정보를 요청
   static Future<Map<String, dynamic>?> getProfile() async {
     try {
       final response = await DioClient.dio.get(ApiConstants.getProfileEndpoint);

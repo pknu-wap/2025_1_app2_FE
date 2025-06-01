@@ -40,8 +40,6 @@ dependencies:
 
   flutter_native_splash: ^2.4.6
 
-  stomp_dart_client: ^0.4.4  # 또는 최신 버전 확인
-
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
@@ -86,13 +84,9 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/kakao_party_map.html
     - assets/app_wide_logo.png
     - assets/kakao_map.html
     - .env
-    - assets/icons/marker_1.png
-    - assets/icons/marker_2.png
-    - assets/icons/marker_3.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:
