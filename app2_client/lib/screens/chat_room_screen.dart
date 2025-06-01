@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:app2_client/screens/report_screen.dart';
 import 'package:app2_client/services/secure_storage_service.dart';
+import 'package:app2_client/screens/my_page_popup.dart';  // 추가
 
 class ChatRoomScreen extends StatefulWidget {
   final String roomId;
@@ -79,39 +80,66 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   Future<void> _loadRouteInfo() async {
     try {
-      final jwt = await loadJwtToken();
+      print('🔄 파티 정보 로딩 시작: ${widget.roomId}');
+      final storage = SecureStorageService();
+      final accessToken = await storage.getAccessToken();
+      
+      if (accessToken == null) {
+        print('❌ 액세스 토큰이 없습니다.');
+        return;
+      }
+
       final response = await http.get(
         Uri.parse('${dotenv.env['BACKEND_BASE_URL']}/api/party/${widget.roomId}'),
-        headers: {'Authorization': 'Bearer $jwt'},
+        headers: {'Authorization': 'Bearer $accessToken'},
       );
 
+      print('📡 API 응답: ${response.statusCode}');
+      print('📄 응답 데이터: ${response.body}');
+
       if (response.statusCode == 200) {
-        final List data = json.decode(response.body);
+        final data = json.decode(response.body);
+        print('✅ 파티 정보 파싱: $data');
+        
         String? start, destination;
-
-        for (var item in data) {
-          final stopover = item['stopover'];
-          final type = stopover['stopover_type'];
-          final address = stopover['location']['address'];
-
-          if (type == 'START') {
-            start = address;
-          } else if (type == 'DESTINATION') {
-            destination = address;
+        if (data is List) {
+          for (var item in data) {
+            final stopover = item['stopover'];
+            if (stopover != null) {
+              final type = stopover['stopover_type'];
+              final location = stopover['location'];
+              if (location != null) {
+                final address = location['address'];
+                if (type == 'START') {
+                  start = address;
+                } else if (type == 'DESTINATION') {
+                  destination = address;
+                }
+              }
+            }
           }
         }
 
         setState(() {
-          startAddress = start ?? '';
-          destinationAddress = destination ?? '';
+          startAddress = start ?? '알 수 없음';
+          destinationAddress = destination ?? '알 수 없음';
           isLoading = false;
         });
+        
+        print('✅ 주소 설정 완료');
+        print('   출발: $startAddress');
+        print('   도착: $destinationAddress');
       } else {
+        print('❌ API 오류: ${response.statusCode}');
         throw Exception('Failed to load route info');
       }
     } catch (e) {
-      print('Error loading route info: $e');
-      setState(() => isLoading = false);
+      print('❌ 파티 정보 로딩 실패: $e');
+      setState(() {
+        startAddress = '로딩 실패';
+        destinationAddress = '로딩 실패';
+        isLoading = false;
+      });
     }
   }
 
@@ -134,7 +162,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             child: IconButton(
               icon: const Icon(Icons.person_outline),
               onPressed: () {
-                Navigator.pushNamed(context, '/myInfo');
+                MyPagePopup.show(context);
               },
             ),
           )
