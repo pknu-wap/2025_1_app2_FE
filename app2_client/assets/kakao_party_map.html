@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <title>파티 지도 보기</title>
+</head>
+<body>
+<div id="map" style="width:100%; height:100vh;"></div>
+
+<!-- Kakao Maps SDK (libraries=services) -->
+<script
+        src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={{KAKAO_JS_KEY}}&libraries=services">
+</script>
+
+<script>
+    let map;
+    // Flutter 쪽에서 중심 좌표(LAT, LNG)를 치환해서 넣어 줘야 합니다.
+    let centerLat = parseFloat('{{CENTER_LAT}}');
+    let centerLng = parseFloat('{{CENTER_LNG}}');
+    console.log('지도 중심 좌표:', centerLat, centerLng);
+
+    // 마커들을 관리하기 위한 객체
+    const markers = {};
+
+    window.onload = function () {
+      const container = document.getElementById('map');
+      const options = {
+        center: new kakao.maps.LatLng(centerLat, centerLng),
+        level: 4
+      };
+      map = new kakao.maps.Map(container, options);
+    };
+
+    // Flutter에서 호출: 마커 추가
+    // id: String, lat: Number, lng: Number, title: String, color: "blue"/"red"/"green" 등
+    window.addMarker = function (id, lat, lng, title, color) {
+      if (!map) {
+        alert('지도(map)가 아직 초기화되지 않았습니다!');
+        return;
+      }
+      // 이미 같은 id의 마커가 있으면 제거
+      if (markers[id]) {
+        markers[id].setMap(null);
+        delete markers[id];
+      }
+
+      const position = new kakao.maps.LatLng(lat, lng);
+      
+      // 카카오 기본 빨간 마커로 통일
+      const imageUrl = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png';
+      const imageSize = new kakao.maps.Size(64, 69);
+      const imageOption = { offset: new kakao.maps.Point(27, 69) };
+
+      const markerImage = new kakao.maps.MarkerImage(imageUrl, imageSize, imageOption);
+      const marker = new kakao.maps.Marker({
+        map: map,
+        position: position,
+        title: title,
+        image: markerImage
+      });
+
+      // 마커 클릭 시 Flutter로 메시지 전달(webview_flutter용)
+      kakao.maps.event.addListener(marker, 'click', function () {
+        if (window.MarkerClick) {
+          window.MarkerClick.postMessage(JSON.stringify({ id: id }));
+        }
+      });
+
+      markers[id] = marker;
+      console.log('마커 추가:', id, lat, lng, title, color);
+    };
+
+    // Flutter에서 호출: 특정 id의 마커를 제거
+    window.removeMarker = function (id) {
+      if (markers[id]) {
+        markers[id].setMap(null);
+        delete markers[id];
+      }
+    };
+
+    // Flutter에서 호출: 지도 중심을 재설정
+    window.setCenter = function (lat, lng) {
+      if (!map) return;
+      const centerPos = new kakao.maps.LatLng(lat, lng);
+      map.setCenter(centerPos);
+    };
+</script>
+</body>
+</html>

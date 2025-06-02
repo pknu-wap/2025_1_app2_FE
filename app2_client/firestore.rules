@@ -1,0 +1,47 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 기본 규칙: 인증된 사용자는 모든 문서 읽기 가능
+    match /{document=**} {
+      allow read: if request.auth != null;
+    }
+
+    // parties 컬렉션에 대한 규칙
+    match /parties/{partyId} {
+      // 생성, 업데이트는 인증된 사용자만 가능
+      allow write: if request.auth != null;
+      // 삭제는 금지
+      allow delete: if false;
+    }
+
+    // 채팅방 컬렉션에 대한 규칙
+    match /chat_rooms/{roomId} {
+      // 읽기, 생성, 업데이트는 인증된 사용자만 가능
+      allow read, write: if request.auth != null;
+      // 삭제는 금지
+      allow delete: if false;
+
+      // 메시지 서브컬렉션에 대한 규칙
+      match /messages/{messageId} {
+        function isMessageValid() {
+          return request.resource.data.text is string &&
+                 request.resource.data.senderId is string &&
+                 request.resource.data.senderName is string &&
+                 request.resource.data.timestamp is timestamp;
+        }
+
+        // 메시지 읽기는 인증된 사용자만 가능
+        allow read: if request.auth != null;
+
+        // 메시지 생성은 본인 확인 후 허용
+        allow create: if request.auth != null && 
+                     (request.resource.data.senderId == request.auth.uid || 
+                      request.resource.data.senderId == request.auth.token.email) &&
+                     isMessageValid();
+        
+        // 수정/삭제는 금지
+        allow update, delete: if false;
+      }
+    }
+  }
+} 
