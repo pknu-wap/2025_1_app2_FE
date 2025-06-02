@@ -6,8 +6,6 @@ import 'package:app2_client/services/socket_service.dart';
 import 'package:provider/provider.dart';
 import 'package:app2_client/providers/auth_provider.dart';
 
-void main() => runApp(const MaterialApp(home: TaxiFarePage(), debugShowCheckedModeBanner: false));
-
 class TaxiFarePage extends StatefulWidget {
   final String partyId;
   final List<StopoverResponse> stopoverList;
@@ -178,7 +176,7 @@ class _TaxiFarePageState extends State<TaxiFarePage> {
       if (!_socketSubscribed) {
         // 요금 입력/승인 이벤트 구독
         SocketService.subscribePartyMembers(
-          partyId: widget.partyId,
+          partyId: int.parse(widget.partyId),
           onMessage: _handleSocketMessage,
         );
         _socketSubscribed = true;
@@ -264,16 +262,12 @@ class _TaxiFarePageState extends State<TaxiFarePage> {
     final hasInput = fareInputs[group] != null;
     String markerImage = 'assets/icons/marker_$group.png';
 
-    // 현재 그룹 이후의 모든 그룹의 탑승자들을 가져옴 (현재 그룹 포함)
+    // 현재 그룹 이전까지의 모든 탑승자를 가져옴
     final remainingPassengers = passengers.entries
-        .where((e) => e.key >= group)
+        .where((e) => e.key > group)  // 현재 그룹 이후의 탑승자만
         .expand((e) => e.value)
         .toSet()
         .toList();
-    
-    // 현재 그룹의 탑승자는 제외 (요금 입력자)
-    final currentGroupPassengers = passengers[group] ?? [];
-    remainingPassengers.removeWhere((name) => currentGroupPassengers.contains(name));
 
     // 승인이 필요한지 확인 (내가 남은 탑승자 중 한 명인지)
     final needsApproval = remainingPassengers.contains(myName);
