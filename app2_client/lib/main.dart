@@ -14,12 +14,9 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env');
 
-  if (Platform.isAndroid) {
-    // Firebase 초기화 (Android에서만 실행)
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  }
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   final authProvider = AuthProvider();
   await authProvider.initTokens();
