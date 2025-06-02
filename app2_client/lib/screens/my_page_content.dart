@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app2_client/services/profile_service.dart';
+import 'package:app2_client/providers/auth_provider.dart';
 
 class MyPage extends StatefulWidget {
   const MyPage({super.key});
@@ -190,6 +192,23 @@ class _MyPageState extends State<MyPage> {
                   ],
                 ),
               ],
+            ),
+          ),
+          // 로그아웃 버튼 추가
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () {
+                // 로그아웃 실행
+                context.read<AuthProvider>().logout();
+              },
+              child: const Text('로그아웃', style: TextStyle(fontSize: 16, color: Colors.white)),
             ),
           ),
         ],

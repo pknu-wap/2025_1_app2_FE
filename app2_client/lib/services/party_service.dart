@@ -17,8 +17,9 @@ class PartyService {
     required double lat,
     required double lng,
     required double radiusKm,
-    required String accessToken,  // ← 토큰 인자 필수로 추가
+    required String accessToken,
   }) async {
+    print('🔍 주변 파티 조회 시작 - 위치: ($lat, $lng), 반경: ${radiusKm}km');
     final body = {
       'lat': lat,
       'lng': lng,
@@ -26,22 +27,31 @@ class PartyService {
     };
 
     try {
+      print('📡 API 요청: ${ApiConstants.partySearchEndpoint}');
       final response = await DioClient.dio.post(
         ApiConstants.partySearchEndpoint,
         data: body,
         options: Options(
           headers: {
-            'Authorization': 'Bearer $accessToken',  // ← 헤더에 토큰 넣기
+            'Authorization': 'Bearer $accessToken',
           },
         ),
       );
-      if (response.statusCode != 200) return [];
+      print('📥 응답 상태 코드: ${response.statusCode}');
+      print('📥 응답 데이터: ${response.data}');
+      
+      if (response.statusCode != 200) {
+        print('❌ 주변 파티 조회 실패: ${response.statusCode}');
+        return [];
+      }
       final List<dynamic> jsonList = response.data as List<dynamic>;
-      return jsonList
+      final parties = jsonList
           .map((e) => PartyModel.fromJson(e as Map<String, dynamic>))
           .toList();
+      print('✅ 주변 파티 ${parties.length}개 조회 성공');
+      return parties;
     } catch (e) {
-      // 에러 발생 시 빈 리스트 반환
+      print('❌ 주변 파티 조회 에러: $e');
       return [];
     }
   }
@@ -51,18 +61,35 @@ class PartyService {
     required PartyCreateRequest request,
     required String accessToken,
   }) async {
-    final body = request.toJson();
-    final response = await DioClient.dio.post(
-      ApiConstants.partyEndpoint,
-      data: body,
-      options: Options(
-        headers: {'Authorization': 'Bearer $accessToken'},
-      ),
-    );
-    if (response.statusCode != 200) {
-      throw Exception('파티 생성 실패: ${response.statusCode}');
+    print('🎉 파티 생성 시작');
+    print('📤 요청 데이터: ${request.toJson()}');
+    
+    try {
+      final body = request.toJson();
+      print('📡 API 요청: ${ApiConstants.partyEndpoint}');
+      final response = await DioClient.dio.post(
+        ApiConstants.partyEndpoint,
+        data: body,
+        options: Options(
+          headers: {'Authorization': 'Bearer $accessToken'},
+        ),
+      );
+      
+      print('📥 응답 상태 코드: ${response.statusCode}');
+      print('📥 응답 데이터: ${response.data}');
+
+      if (response.statusCode != 200) {
+        print('❌ 파티 생성 실패: ${response.statusCode}');
+        throw Exception('파티 생성 실패: ${response.statusCode}');
+      }
+      
+      final partyDetail = PartyDetail.fromJson(response.data as Map<String, dynamic>);
+      print('✅ 파티 생성 성공 - 파티 ID: ${partyDetail.partyId}');
+      return partyDetail;
+    } catch (e) {
+      print('❌ 파티 생성 에러: $e');
+      throw e;
     }
-    return PartyDetail.fromJson(response.data as Map<String, dynamic>);
   }
 
   /// 파티 참여
@@ -133,12 +160,25 @@ class PartyService {
 
   /// 내가 만든 파티 조회
   static Future<PartyDetail?> getMyParty() async {
-    final response =
-    await DioClient.dio.post("${ApiConstants.baseUrl}/api/party/my");
-    if (response.statusCode == 200) {
-      return PartyDetail.fromJson(response.data as Map<String, dynamic>);
+    print('🔍 내 파티 조회 시작');
+    try {
+      print('📡 API 요청: ${ApiConstants.baseUrl}/api/party/my');
+      final response = await DioClient.dio.post("${ApiConstants.baseUrl}/api/party/my");
+      
+      print('📥 응답 상태 코드: ${response.statusCode}');
+      print('📥 응답 데이터: ${response.data}');
+      
+      if (response.statusCode == 200) {
+        final partyDetail = PartyDetail.fromJson(response.data as Map<String, dynamic>);
+        print('✅ 내 파티 조회 성공 - 파티 ID: ${partyDetail.partyId}');
+        return partyDetail;
+      }
+      print('❌ 내 파티 조회 실패: ${response.statusCode}');
+      return null;
+    } catch (e) {
+      print('❌ 내 파티 조회 에러: $e');
+      return null;
     }
-    return null;
   }
 
   /// 파티 상세조회

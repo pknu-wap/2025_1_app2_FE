@@ -8,10 +8,13 @@ import 'package:provider/provider.dart';
 import 'package:app2_client/providers/auth_provider.dart';
 import '../services/party_service.dart';
 import '../services/socket_service.dart';
+import 'package:dio/dio.dart';
+import 'package:app2_client/main.dart'; // navigatorKey import
+import 'package:overlay_support/overlay_support.dart';
 
 /// 파티 참여 모달 (팟 신청하기)
-/// - STOMP 연결 후 “/user/queue/join-request-response” 개인 응답 채널을 구독
-/// - 서버가 “PENDING” → “ACCEPTED”(또는 APPROVED) → “REJECTED” → “CANCELED” 등의 상태를 내려줌
+/// - STOMP 연결 후 "/user/queue/join-request-response" 개인 응답 채널을 구독
+/// - 서버가 "PENDING" → "ACCEPTED"(또는 APPROVED) → "REJECTED" → "CANCELED" 등의 상태를 내려줌
 class PartyJoinModal extends StatefulWidget {
   final PartyModel pot;
 
@@ -26,13 +29,13 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
   bool _loading = false;
   bool _subscribed = false;
 
-  /// 서버가 내려주는 “요청 ID”를 로컬에 저장해 두면, 취소 시에 사용
+  /// 서버가 내려주는 "요청 ID"를 로컬에 저장해 두면, 취소 시에 사용
   int? _pendingRequestId;
 
   /// 지금 모달이 어떤 상태인지
   /// - 'IDLE'    : 아직 신청 전
   /// - 'WAIT'    : HTTP 요청 전송 직후 (로딩 중)
-  /// - 'PENDING' : 서버에서 “PENDING” 상태를 내려줌 (방장 승인 대기)
+  /// - 'PENDING' : 서버에서 "PENDING" 상태를 내려줌 (방장 승인 대기)
   /// - 'APPROVED': 서버에서 승인(또는 ACCEPTED) 상태를 내려줌 → 바로 파티 화면으로 이동
   /// - 'REJECTED': 서버에서 거절 상태를 내려줌 → 스낵바 띄우고 모달 닫힘
   /// - 'CANCELED': 서버에서 취소 상태를 내려줌 → 스낵바 띄우고 모달 닫힘
@@ -47,7 +50,7 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
     _accessToken = auth.tokens?.accessToken;
 
     if (_accessToken == null) {
-      // 토큰이 없으면 모달을 종료하고 “로그인이 필요합니다” 메시지 출력
+      // 토큰이 없으면 모달을 종료하고 "로그인이 필요합니다" 메시지 출력
       Future.microtask(() {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -82,7 +85,7 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
         : (reqIdValue != null ? int.tryParse(reqIdValue.toString()) : null);
 
     if (status == 'PENDING' && parsedReqId != null) {
-      // 서버가 PENDING으로 내려줄 때, 로컬에 request ID를 저장하고 버튼을 “취소” 모드로 변경
+      // 서버가 PENDING으로 내려줄 때, 로컬에 request ID를 저장하고 버튼을 "취소" 모드로 변경
       setState(() {
         _pendingRequestId = parsedReqId;
         _joinStatus = 'PENDING';
@@ -118,7 +121,7 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
     }
   }
 
-  /// “팟 신청하기” 버튼 클릭 시 HTTP 호출 → 서버에서 PENDING 메시지를 STOMP로 내려줌
+  /// "팟 신청하기" 버튼 클릭 시 HTTP 호출 → 서버에서 PENDING 메시지를 STOMP로 내려줌
   Future<void> _joinParty() async {
     try {
       setState(() {
@@ -130,9 +133,26 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
         accessToken: _accessToken!,
       );
       // 이후 PENDING/ACCEPTED/REJECTED/… 은 WebSocket으로 처리
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 409) {
+        showSimpleNotification(
+          const Text('이미 참여중인 파티입니다.'),
+          background: Colors.red,
+          position: NotificationPosition.top,
+        );
+      } else {
+        showSimpleNotification(
+          Text('참가 실패: $e'),
+          background: Colors.red,
+          position: NotificationPosition.top,
+        );
+      }
+      setState(() => _joinStatus = 'IDLE');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('참가 실패: $e')),
+      showSimpleNotification(
+        Text('참가 실패: $e'),
+        background: Colors.red,
+        position: NotificationPosition.top,
       );
       setState(() => _joinStatus = 'IDLE');
     } finally {
@@ -140,7 +160,7 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
     }
   }
 
-  /// “참여 요청 취소” 버튼 클릭 시 HTTP 호출 → 서버에서 CANCELED 메시지를 STOMP로 내려줌
+  /// "참여 요청 취소" 버튼 클릭 시 HTTP 호출 → 서버에서 CANCELED 메시지를 STOMP로 내려줌
   Future<void> _cancelJoinRequest() async {
     if (_pendingRequestId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -217,7 +237,7 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
                   Text('출발: ${widget.pot.originAddress}'),
                   Text('도착: ${widget.pot.destAddress}'),
                   const SizedBox(height: 24),
-                  // “팟 신청하기” / “참여 요청 취소” 버튼
+                  // "팟 신청하기" / "참여 요청 취소" 버튼
                   if (_joinStatus == 'IDLE' || _joinStatus == 'WAIT')
                     ElevatedButton(
                       onPressed:

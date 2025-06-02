@@ -1,6 +1,7 @@
 // lib/providers/auth_provider.dart
 import 'package:app2_client/models/user_model.dart';
 import 'package:app2_client/services/auth_service.dart';
+import 'package:app2_client/services/secure_storage_service.dart';
 import 'package:flutter/material.dart';
 
 class AuthProvider extends ChangeNotifier {
@@ -80,5 +81,24 @@ class AuthProvider extends ChangeNotifier {
     }
 
     return false;
+  }
+
+  /// 앱 시작 시 secure storage에서 토큰을 불러와 Provider에 세팅
+  Future<void> initTokens() async {
+    final storage = SecureStorageService();
+    final accessToken = await storage.getAccessToken();
+    final refreshToken = await storage.getRefreshToken();
+    if (accessToken != null && accessToken.isNotEmpty && refreshToken != null && refreshToken.isNotEmpty) {
+      _tokens = AuthResponse(statusCode: 200, accessToken: accessToken, refreshToken: refreshToken);
+      notifyListeners();
+    }
+  }
+
+  /// 로그아웃: 토큰/유저 상태 초기화 및 AuthService.logout 호출
+  Future<void> logout() async {
+    await _authService.logout();
+    _tokens = null;
+    _user = null;
+    notifyListeners();
   }
 }
