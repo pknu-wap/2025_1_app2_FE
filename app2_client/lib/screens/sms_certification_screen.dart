@@ -53,14 +53,6 @@ class _SmsCertificationScreenState extends State<SmsCertificationScreen> with Wi
         elevation: 0,
         backgroundColor: Colors.white,
         automaticallyImplyLeading: false,
-        title: const Text(
-          '기기인증 안내',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 28,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
         centerTitle: false,
       ),
       body: Padding(
@@ -68,22 +60,32 @@ class _SmsCertificationScreenState extends State<SmsCertificationScreen> with Wi
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildStepText('① 하단 [인증 메시지 보내기] 눌러주세요'),
-            const SizedBox(height: 6),
-            _buildStepText('② 메시지 작성 창에서, 인증 메시지가 자동으로 입력되어 있습니다.'),
-            const SizedBox(height: 6),
-            _buildStepText('③ 인증 메시지를 그대로 보내주세요.'),
-            const SizedBox(height: 32),
-            Center(child: _buildPhoneMockup()),
+            const SizedBox(height: 16),
+            const Text(
+              '기기인증 안내',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 28,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(height: 24),
+            _buildStepText('① 하단 [인증 메시지 보내기] 눌러주세요'),
+            const SizedBox(height: 16),
+            _buildStepText('② 메시지 작성 창에서, 인증 메시지가 자동으로 입력되어 있습니다.'),
+            const SizedBox(height: 16),
+            _buildStepText('③ 인증 메시지를 그대로 보내주세요.'),
+            const SizedBox(height: 40),
+            Center(child: _buildPhoneMockup()),
+            const SizedBox(height: 32),
             Text(
-              '· 이용 중인 통신 요금제에 따라 문자 메시지 발송 비용이 청구될 수 있습니다.',
+              '이용 중인 통신 요금제에 따라 문자 메시지 발송 비용이 청구될 수 있습니다.',
               style: TextStyle(
                 fontSize: 13,
                 color: Colors.grey[700],
               ),
             ),
-            const Spacer(),
+            const Spacer(flex: 5),
             SizedBox(
               width: double.infinity,
               height: 54,
@@ -93,16 +95,17 @@ class _SmsCertificationScreenState extends State<SmsCertificationScreen> with Wi
                   await verifySms();
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF20C4F8),
+                  backgroundColor: const Color(0xFF003366),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
                 child: const Text(
                   '인증 메시지 보내기',
                   style: TextStyle(
                     fontSize: 20,
-                    fontWeight: FontWeight.w600
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white
                   ),
                 ),
               ),
@@ -203,86 +206,91 @@ class _SmsCertificationScreenState extends State<SmsCertificationScreen> with Wi
       width: 320,
       height: 200,
       decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: Colors.grey[300]!, width: 2),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey[300]!, width: 1.5),
       ),
-      child: Stack(
+      child: Column(
         children: [
-          // Phone receiver text
-          Positioned(
-            top: 30,
-            left: 30,
-            child: RichText(
-              text: const TextSpan(
-                text: '받는 사람 : ',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
-                ),
-                children: [
-                  TextSpan(
-                    text: '1000-1000',
-                    style: TextStyle(
-                      color: Color(0xFF20C4F8),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
+          // 받는 사람 영역
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
               ),
             ),
+            child: Row(
+              children: [
+                Text(
+                  '받는 사람',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'verify@gmail.com',
+                  style: TextStyle(
+                    color: Color(0xFF003366),
+                    fontWeight: FontWeight.w500,
+                    fontSize: 15,
+                  ),
+                ),
+              ],
+            ),
           ),
-          // Message box
-          Positioned(
-            top: 60,
-            left: 12,
-            right: 12,
+          // 구분선
+          Container(
+            height: 1,
+            color: Colors.grey[300],
+          ),
+          // 메시지 입력 영역
+          Expanded(
             child: Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: Colors.grey[300]!),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.07),
-                    blurRadius: 2,
-                    offset: const Offset(1, 2),
-                  ),
-                ],
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(16),
+                  bottomRight: Radius.circular(16),
+                ),
               ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  Expanded(
-                    child: Text.rich(
-                      TextSpan(
-                        children: [
-                          const TextSpan(
-                            text: '인증문자 보내기\n',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black,
-                              fontSize: 14,
-                            ),
-                          ),
-                          TextSpan(
-                            text: 'kjsu34kjd9fdjflejdnalsmcff8d7djldkfls3k5\n'
-                                'k4jfnd9clskhdfwrsk4jfnd9clskhdfwrsk4jfnd9clskhdfwrs',
-                            style: TextStyle(
-                              color: Colors.grey[700],
-                              fontSize: 13.5,
-                            ),
-                          ),
-                        ],
-                      ),
+                  // 메시지 입력창
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[300]!),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Icon(
-                    Icons.arrow_upward_rounded,
-                    color: const Color(0xFF20C4F8),
-                    size: 36,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'kjsu34kjd9fdjflejdnalsmcff8d7djldkfls3k5',
+                            style: TextStyle(
+                              color: Colors.grey[800],
+                              fontSize: 13,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(
+                          Icons.arrow_upward_rounded,
+                          color: const Color(0xFF003366),
+                          size: 24,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
