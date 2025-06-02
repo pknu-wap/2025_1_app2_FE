@@ -51,6 +51,7 @@
 		<!-- 앱에서 google://… 콜도 쓸 수 있게 -->
 		<key>LSApplicationQueriesSchemes</key>
 		<array>
+            <string>sms</string>
 			<string>google</string>
 			<string>com.googleusercontent.apps.246777075609-b1tnl2lqhv7lrkmpirvlvtgb75tlg76l</string>
 		</array>
