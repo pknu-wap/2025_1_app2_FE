@@ -30,6 +30,19 @@ class AuthProvider extends ChangeNotifier {
 
     if (resp != null && resp.statusCode == 200) {
       _tokens = resp;
+      
+      // 사용자 정보 저장
+      print('🔄 사용자 정보 저장 시도');
+      print('   ▶ userId: ${u.email}');
+      print('   ▶ userName: ${u.name}');
+      
+      await _authService.saveUserInfo(
+        userId: u.email, // 이메일을 userId로 사용
+        userName: u.name,
+      );
+      
+      print('✅ 사용자 정보 저장 완료');
+      
       notifyListeners();
       return 'SUCCESS';
     } else if (resp?.statusCode == 404) {

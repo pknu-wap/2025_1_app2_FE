@@ -5,6 +5,7 @@ import 'package:app2_client/screens/destination_select_screen.dart';
 import 'package:app2_client/widgets/phone_number_formatter.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:app2_client/services/secure_storage_service.dart';
 
 class SignupScreen extends StatefulWidget {
   final String session, idToken, accessToken, name, email, phone;
@@ -43,6 +44,12 @@ class _SignupScreenState extends State<SignupScreen> {
       // ✅ accessToken 저장
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('accessToken', widget.accessToken);
+
+      // 사용자 정보 저장
+      await SecureStorageService().saveUserInfo(
+        userId: widget.email,
+        userName: widget.name,
+      );
 
       if (!mounted) return;
 
