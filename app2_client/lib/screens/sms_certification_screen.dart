@@ -60,7 +60,7 @@ class _SmsCertificationScreenState extends State<SmsCertificationScreen> with Wi
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Spacer(flex: 2),
+            const SizedBox(height: 16),
             const Text(
               '기기인증 안내',
               style: TextStyle(
@@ -85,7 +85,7 @@ class _SmsCertificationScreenState extends State<SmsCertificationScreen> with Wi
                 color: Colors.grey[700],
               ),
             ),
-            const Spacer(flex: 3),
+            const Spacer(flex: 5),
             SizedBox(
               width: double.infinity,
               height: 54,
