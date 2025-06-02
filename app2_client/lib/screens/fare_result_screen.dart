@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:app2_client/providers/auth_provider.dart';
+import 'package:app2_client/services/websocket_service.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -33,12 +34,55 @@ class _FareResultScreenState extends State<FareResultScreen> {
   List<Map<String, dynamic>> users = [];
   String? currentUserEmail;
   bool isLoading = true;
+  late final WebSocketService _webSocketService;
+  StreamSubscription? _fareSubscription;
 
   @override
   void initState() {
     super.initState();
+    _webSocketService = WebSocketService();
     _loadCurrentUserEmail();
     fetchFareData();
+    _setupWebSocket();
+  }
+
+  void _setupWebSocket() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final token = authProvider.jwtToken;
+    
+    _webSocketService.connect(widget.partyId, token!);
+    _fareSubscription = _webSocketService.fareUpdates.listen((data) {
+      setState(() {
+        users = List<Map<String, dynamic>>.from(data['users']);
+      });
+
+      // 모든 사용자가 정산 완료되었는지 확인
+      if (widget.isBookkeeper && _isAllUsersConfirmed()) {
+        _navigateToPartyEvaluation();
+      }
+    });
+  }
+
+  bool _isAllUsersConfirmed() {
+    return users.every((user) => user['confirmed'] == true);
+  }
+
+  void _navigateToPartyEvaluation() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PartyEvaluationScreen(
+          partyId: widget.partyId,
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _fareSubscription?.cancel();
+    _webSocketService.dispose();
+    super.dispose();
   }
 
   Future<void> _loadCurrentUserEmail() async {
@@ -94,11 +138,15 @@ class _FareResultScreenState extends State<FareResultScreen> {
       );
 
       if (response.statusCode == 200) {
-        // 성공 시 데이터 새로고침
-        await fetchFareData();
+        // WebSocket을 통해 업데이트될 것이므로 fetchFareData() 호출 제거
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('확인 처리되었습니다.')),
         );
+
+        // 정산자가 모든 사용자의 정산을 확인했는지 체크
+        if (widget.isBookkeeper && _isAllUsersConfirmed()) {
+          _navigateToPartyEvaluation();
+        }
       } else {
         throw Exception('Failed to confirm fare');
       }
