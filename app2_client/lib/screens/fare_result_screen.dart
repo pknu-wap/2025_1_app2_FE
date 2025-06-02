@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:app2_client/providers/auth_provider.dart';
 import 'package:app2_client/services/websocket_service.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:app2_client/services/fare_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:app2_client/screens/review_page.dart';
+import 'package:app2_client/models/party_member_model.dart';
 
 class FareResultScreen extends StatefulWidget {
   final String partyId;
@@ -31,7 +34,7 @@ class FareResultScreen extends StatefulWidget {
 }
 
 class _FareResultScreenState extends State<FareResultScreen> {
-  List<Map<String, dynamic>> users = [];
+  List<PartyMember> users = [];
   String? currentUserEmail;
   bool isLoading = true;
   late final WebSocketService _webSocketService;
@@ -52,11 +55,11 @@ class _FareResultScreenState extends State<FareResultScreen> {
     
     _webSocketService.connect(widget.partyId, token!);
     _fareSubscription = _webSocketService.fareUpdates.listen((data) {
+      final usersList = List<Map<String, dynamic>>.from(data['users']);
       setState(() {
-        users = List<Map<String, dynamic>>.from(data['users']);
+        users = usersList.map((user) => PartyMember.fromJson(user)).toList();
       });
 
-      // 모든 사용자가 정산 완료되었는지 확인
       if (widget.isBookkeeper && _isAllUsersConfirmed()) {
         _navigateToPartyEvaluation();
       }
@@ -64,16 +67,14 @@ class _FareResultScreenState extends State<FareResultScreen> {
   }
 
   bool _isAllUsersConfirmed() {
-    return users.every((user) => user['confirmed'] == true);
+    return users.every((user) => user.confirmed);
   }
 
   void _navigateToPartyEvaluation() {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (context) => PartyEvaluationScreen(
-          partyId: widget.partyId,
-        ),
+        builder: (context) => const ReviewPage(),
       ),
     );
   }
@@ -106,8 +107,9 @@ class _FareResultScreenState extends State<FareResultScreen> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        final usersList = List<Map<String, dynamic>>.from(data['users']);
         setState(() {
-          users = List<Map<String, dynamic>>.from(data['users']);
+          users = usersList.map((user) => PartyMember.fromJson(user)).toList();
           isLoading = false;
         });
       } else {
@@ -196,18 +198,14 @@ class _FareResultScreenState extends State<FareResultScreen> {
                   itemCount: users.length,
                   itemBuilder: (context, index) {
                     final user = users[index];
-                    final userEmail = user['email'] as String;
-                    final isConfirmed = user['confirmed'] as bool;
-                    final amount = user['amount'] as int;
+                    final isConfirmed = user.confirmed;
+                    final amount = user.amount;
                     
-                    // 버튼 표시 여부 결정
                     bool showButton = false;
                     if (widget.isBookkeeper) {
-                      // 결산자는 자신을 제외한 모든 사용자의 버튼을 볼 수 있음
-                      showButton = userEmail != widget.bookkeeperEmail;
+                      showButton = user.email != widget.bookkeeperEmail;
                     } else {
-                      // 일반 사용자는 자신의 버튼만 볼 수 있음
-                      showButton = userEmail == currentUserEmail;
+                      showButton = user.email == currentUserEmail;
                     }
 
                     return Container(
@@ -226,7 +224,7 @@ class _FareResultScreenState extends State<FareResultScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  user['name'] as String,
+                                  user.name,
                                   style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
@@ -234,7 +232,7 @@ class _FareResultScreenState extends State<FareResultScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  '${amount.toString()}원',
+                                  '${amount}원',
                                   style: const TextStyle(
                                     fontSize: 14,
                                     color: Colors.grey,
@@ -246,7 +244,7 @@ class _FareResultScreenState extends State<FareResultScreen> {
                           if (showButton) ...[
                             const SizedBox(width: 8),
                             ElevatedButton(
-                              onPressed: isConfirmed ? null : () => _handleFareConfirmation(userEmail),
+                              onPressed: isConfirmed ? null : () => _handleFareConfirmation(user.email),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: isConfirmed ? Colors.grey : Colors.blue,
                                 foregroundColor: Colors.white,
