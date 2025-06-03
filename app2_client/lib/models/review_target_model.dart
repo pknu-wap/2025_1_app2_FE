@@ -15,11 +15,26 @@ class MyPageCard extends StatelessWidget {
           BoxShadow(
             color: Colors.black12,
             blurRadius: 10,
+            spreadRadius: 0,
             offset: const Offset(2, 4),
           ),
         ],
       ),
-      child: const MyPage(),
+      child: Stack(
+        children: [
+          const MyPage(),
+          Positioned(
+            top: 0,
+            right: 0,
+            child: GestureDetector(
+              onTap: () {
+                Navigator.pop(context);
+              },
+              child: const Icon(Icons.close, size: 24, color: Colors.black54),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -36,12 +51,9 @@ class _MyPageState extends State<MyPage> {
   String phone = '';
   String gender = '';
   int age = 0;
-  double rating = 0.0;
-  String profileImageUrl = '';
+  double rating = 3.2;
+  List<String> tags = ['친절', '시간 엄수'];
   bool _isLoading = true;
-  List<String> topTags = [];
-  int totalSavedAmount = 0;
-
 
   @override
   void initState() {
@@ -58,10 +70,6 @@ class _MyPageState extends State<MyPage> {
           phone = profile['phone'] ?? '';
           gender = profile['gender'] == 'MALE' ? '남' : '여';
           age = profile['age'] ?? 0;
-          rating = (profile['review_score'] ?? 0.0).toDouble();
-          profileImageUrl = profile['profileImageUrl'] ?? '';
-          topTags = List<String>.from(profile['top_tags'] ?? []);
-          totalSavedAmount = profile['total_saved_amount'] ?? 0;
         } else {
           name = '불러오기 실패';
         }
@@ -82,50 +90,29 @@ class _MyPageState extends State<MyPage> {
     }
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        /// 프로필 영역
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(
-              radius: 30,
-              backgroundImage: profileImageUrl.isNotEmpty
-                  ? NetworkImage(profileImageUrl)
-                  : null,
-              backgroundColor: Colors.grey.shade300,
-              child: profileImageUrl.isEmpty
-                  ? const Icon(Icons.person, size: 30, color: Colors.white)
-                  : null,
-            ),
+            const CircleAvatar(radius: 30, backgroundColor: Colors.grey),
             const SizedBox(width: 16),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Text(name,
-                        style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'jua')),
+                    Text(name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, fontFamily: 'jua')),
                     const SizedBox(width: 8),
-                    Text('$age세 ($gender)',
-                        style: const TextStyle(
-                            fontSize: 16, color: Colors.grey, fontFamily: 'jua')),
+                    Text('$age세 ($gender)', style: const TextStyle(fontSize: 16, color: Colors.grey, fontFamily: 'jua')),
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text(phone,
-                    style: const TextStyle(fontSize: 16, fontFamily: 'jua')),
+                Text(phone, style: const TextStyle(fontSize: 16, fontFamily: 'jua')),
               ],
             ),
           ],
         ),
-
         const SizedBox(height: 16),
-
-        /// 아낀 금액
         Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 14),
@@ -133,15 +120,11 @@ class _MyPageState extends State<MyPage> {
             color: const Color(0xFFF6C651),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Center(
-            child: Text('아낀 금액 ‘ ${totalSavedAmount}원 ’',
-                style: TextStyle(fontSize: 16, fontFamily: 'jua')),
+          child: const Center(
+            child: Text('아낀 금액 ‘ ------- 원 ’', style: TextStyle(fontSize: 16, fontFamily: 'jua')),
           ),
         ),
-
         const SizedBox(height: 16),
-
-        /// 평점
         Row(
           children: [
             Container(
@@ -153,9 +136,7 @@ class _MyPageState extends State<MyPage> {
                   bottomLeft: Radius.circular(4),
                 ),
               ),
-              child: const Text('평점',
-                  style: TextStyle(
-                      fontSize: 14, color: Colors.white, fontFamily: 'jua')),
+              child: const Text('평점', style: TextStyle(fontSize: 14, color: Colors.white, fontFamily: 'jua')),
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
@@ -166,18 +147,11 @@ class _MyPageState extends State<MyPage> {
                   bottomRight: Radius.circular(4),
                 ),
               ),
-              child: Text('#${rating.toStringAsFixed(1)}',
-                  style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFFF6C651),
-                      fontFamily: 'jua')),
+              child: Text('#${rating.toStringAsFixed(1)}', style: const TextStyle(fontSize: 14, color: Color(0xFFF6C651), fontFamily: 'jua')),
             ),
           ],
         ),
-
         const SizedBox(height: 12),
-
-        /// 후기 키워드
         Row(
           children: [
             Container(
@@ -189,29 +163,23 @@ class _MyPageState extends State<MyPage> {
                   bottomLeft: Radius.circular(4),
                 ),
               ),
-              child: const Text('후기 키워드',
-                  style: TextStyle(
-                      fontSize: 13, color: Colors.white, fontFamily: 'jua')),
+              child: const Text('후기 키워드', style: TextStyle(fontSize: 13, color: Colors.white, fontFamily: 'jua')),
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Wrap(
-                spacing: 6,
-                runSpacing: 4,
-                children: topTags.map((tag) => Text(
-                  tag,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF1F355F),
-                    fontFamily: 'jua',
+            for (int i = 0; i < tags.length; i++)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEAF1FB),
+                  border: Border.all(color: const Color(0xFF5271FF)),
+                  borderRadius: BorderRadius.only(
+                    topRight: Radius.circular(i == tags.length - 1 ? 4 : 0),
+                    bottomRight: Radius.circular(i == tags.length - 1 ? 4 : 0),
                   ),
-                )).toList(),
+                ),
+                child: Text('#${tags[i]}', style: const TextStyle(fontSize: 13, color: Color(0xFF1F355F), fontFamily: 'jua')),
               ),
-            ),
           ],
         ),
-
-        const SizedBox(height: 24),
       ],
     );
   }

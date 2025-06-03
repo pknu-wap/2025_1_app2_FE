@@ -1,8 +1,7 @@
-// lib/screens/my_page_popup.dart
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:app2_client/screens/home_star.dart';
 import 'package:app2_client/screens/my_page_content.dart';
+import 'package:app2_client/services/auth_service.dart';
 
 class MyPagePopup {
   static void show(BuildContext context) {
@@ -12,52 +11,102 @@ class MyPagePopup {
       builder: (BuildContext context) {
         return Material(
           color: Colors.transparent,
-          child: Center(
-            child: Container(
-              width: 320,
-              constraints: const BoxConstraints(
-                maxHeight: 700,
-              ),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: Align(
+            alignment: Alignment.topRight,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 50, right: 5),
+              child: Container(
+                width: 320,
+                height: 450,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Stack(
                   children: [
-                    Align(
-                      alignment: Alignment.topRight,
-                      child: GestureDetector(
-                        onTap: () => Navigator.of(context).pop(),
-                        child: const Icon(Icons.close, size: 20, color: Colors.black54),
+                    /// 콘텐츠
+                    SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          /// 상단 로고 + 알림 아이콘
+                          Row(
+                            children: [
+                              Image.asset(
+                                'assets/app_wide_logo.png',
+                                height: 50,
+                                width: 130,
+                                fit: BoxFit.contain,
+                              ),
+                              const Spacer(),
+                              GestureDetector(
+                                onTap: () => Navigator.pop(context),  // 알림 아이콘 눌렀을 때 닫기
+                                child: Image.asset(
+                                  'assets/user_notify_icon.png',
+                                  width: 40,
+                                  height: 40,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+
+                          /// 마이페이지 카드
+                          Stack(
+                            children: [
+                              const MyPageCard(),
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: GestureDetector(
+                                  onTap: () => Navigator.pop(context),
+                                  child: const Icon(Icons.close, size: 20, color: Colors.black54),
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 64), // 하단 버튼 공간 확보
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    MyPage(),
-                    const SizedBox(height: 24),
-                    const Text(
-                      '동승자를 평가해주세요!',
-                      style: TextStyle(fontSize: 16, fontFamily: 'jua'),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Color(0xFF1F355F),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const ReviewPage()),
+
+                    /// 로그아웃 버튼
+                    Positioned(
+                      bottom: 8,
+                      right: 8,
+                      child: IconButton(
+                        icon: const Icon(Icons.logout, color: Colors.grey),
+                        tooltip: '로그아웃',
+                        onPressed: () async {
+                          final shouldLogout = await showDialog<bool>(
+                            context: context,
+                            builder: (_) => AlertDialog(
+                              title: const Text("로그아웃"),
+                              content: const Text("정말 로그아웃 하시겠어요?"),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, false),
+                                  child: const Text("취소"),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: const Text("로그아웃"),
+                                ),
+                              ],
+                            ),
                           );
+
+                          if (shouldLogout == true) {
+                            await AuthService().logout();
+                            Navigator.pushNamedAndRemoveUntil(
+                              context,
+                              '/login',
+                                  (route) => false,
+                            );
+                          }
                         },
-                        child: const Text('평가하러 가기', style: TextStyle(fontSize: 14, fontFamily: 'jua', color: Colors.white)),
                       ),
                     ),
                   ],

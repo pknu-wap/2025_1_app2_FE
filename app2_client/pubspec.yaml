@@ -93,6 +93,7 @@ flutter:
     - assets/app_wide_logo.png
     - assets/kakao_map.html
     - .env
+    - assets/user_notify_icon.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:
