@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:app2_client/services/profile_service.dart';
-import 'package:app2_client/providers/auth_provider.dart';
 
 class MyPageCard extends StatelessWidget {
   const MyPageCard({super.key});
@@ -21,21 +19,7 @@ class MyPageCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Stack(
-        children: [
-          const MyPage(),
-          Positioned(
-            top: 0,
-            right: 0,
-            child: GestureDetector(
-              onTap: () {
-                Navigator.pop(context);
-              },
-              child: const Icon(Icons.close, size: 24, color: Colors.black54),
-            ),
-          ),
-        ],
-      ),
+      child: const MyPage(),
     );
   }
 }
@@ -55,6 +39,9 @@ class _MyPageState extends State<MyPage> {
   double rating = 0.0;
   String profileImageUrl = '';
   bool _isLoading = true;
+  List<String> topTags = [];
+  int totalSavedAmount = 0;
+
 
   @override
   void initState() {
@@ -73,6 +60,8 @@ class _MyPageState extends State<MyPage> {
           age = profile['age'] ?? 0;
           rating = (profile['review_score'] ?? 0.0).toDouble();
           profileImageUrl = profile['profileImageUrl'] ?? '';
+          topTags = List<String>.from(profile['top_tags'] ?? []);
+          totalSavedAmount = profile['total_saved_amount'] ?? 0;
         } else {
           name = '불러오기 실패';
         }
@@ -93,7 +82,9 @@ class _MyPageState extends State<MyPage> {
     }
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        /// 프로필 영역
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -131,7 +122,10 @@ class _MyPageState extends State<MyPage> {
             ),
           ],
         ),
+
         const SizedBox(height: 16),
+
+        /// 아낀 금액
         Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 14),
@@ -139,12 +133,15 @@ class _MyPageState extends State<MyPage> {
             color: const Color(0xFFF6C651),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: const Center(
-            child: Text('아낀 금액 ‘ ------- 원 ’',
+          child: Center(
+            child: Text('아낀 금액 ‘ ${totalSavedAmount}원 ’',
                 style: TextStyle(fontSize: 16, fontFamily: 'jua')),
           ),
         ),
+
         const SizedBox(height: 16),
+
+        /// 평점
         Row(
           children: [
             Container(
@@ -177,7 +174,10 @@ class _MyPageState extends State<MyPage> {
             ),
           ],
         ),
+
         const SizedBox(height: 12),
+
+        /// 후기 키워드
         Row(
           children: [
             Container(
@@ -194,34 +194,25 @@ class _MyPageState extends State<MyPage> {
                       fontSize: 13, color: Colors.white, fontFamily: 'jua')),
             ),
             const SizedBox(width: 8),
-            const Text('#친절 #시간 엄수',
-                style: TextStyle(
+            Expanded(
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: topTags.map((tag) => Text(
+                  tag,
+                  style: const TextStyle(
                     fontSize: 13,
                     color: Color(0xFF1F355F),
-                    fontFamily: 'jua')),
+                    fontFamily: 'jua',
+                  ),
+                )).toList(),
+              ),
+            ),
           ],
         ),
+
+        const SizedBox(height: 24),
       ],
-          ),
-          // 로그아웃 버튼 추가
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              onPressed: () {
-                // 로그아웃 실행
-                context.read<AuthProvider>().logout();
-              },
-              child: const Text('로그아웃', style: TextStyle(fontSize: 16, color: Colors.white)),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
