@@ -23,49 +23,65 @@ class SignupScreen extends StatefulWidget {
 class _SignupScreenState extends State<SignupScreen> {
   final _form = GlobalKey<FormState>();
   String _phone = '', _age = '20', _gender = 'MALE';
+  bool _isLoading = false;
 
   Future<void> _submit() async {
     if (!_form.currentState!.validate()) return;
-    _form.currentState!.save();
+    if (_isLoading) return;
+    
+    setState(() {
+      _isLoading = true;
+    });
 
-    // 하이픈 제거된 전화번호 생성
-    final cleanPhone = _phone.replaceAll('-', '');
+    try {
+      _form.currentState!.save();
 
-    final resp = await AuthService().registerOnServer(
-      session: widget.session,
-      idToken: widget.idToken,
-      accessToken: widget.accessToken,
-      name: widget.name,
-      phone: cleanPhone,  // 하이픈이 제거된 전화번호 전송
-      age: 20,
-      gender: _gender,
-    );
+      // 하이픈 제거된 전화번호 생성
+      final cleanPhone = _phone.replaceAll('-', '');
 
-    if (resp != null) {
-      // ✅ accessToken 저장
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('accessToken', widget.accessToken);
-
-      // 사용자 정보 저장
-      await SecureStorageService().saveUserInfo(
-        userId: widget.email,
-        userName: widget.name,
+      final resp = await AuthService().registerOnServer(
+        session: widget.session,
+        idToken: widget.idToken,
+        accessToken: widget.accessToken,
+        name: widget.name,
+        phone: cleanPhone,
+        age: 20,
+        gender: _gender,
       );
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('회원가입 완료!')),
-      );
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const DestinationSelectScreen()),
-      );
-    }
-    else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('회원가입 실패')),
-      );
+      if (resp != null) {
+        // ✅ accessToken 저장
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('accessToken', widget.accessToken);
+
+        // 사용자 정보 저장
+        await SecureStorageService().saveUserInfo(
+          userId: widget.email,
+          userName: widget.name,
+        );
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('회원가입 완료!')),
+        );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const DestinationSelectScreen()),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('회원가입 실패')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -195,14 +211,24 @@ class _SignupScreenState extends State<SignupScreen> {
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: _submit,
+                    onPressed: _isLoading ? null : _submit,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Color(0xFF003366),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
+                      disabledBackgroundColor: Colors.grey,
                     ),
-                    child: Text('회원가입',style: TextStyle(color: Colors.white, fontSize: 18),),
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Text('회원가입', style: TextStyle(color: Colors.white, fontSize: 18)),
                   ),
                 ),
               ],
