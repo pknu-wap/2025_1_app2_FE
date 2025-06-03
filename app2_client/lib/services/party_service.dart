@@ -7,6 +7,8 @@ import 'package:app2_client/models/party_create_request.dart';
 import 'package:app2_client/models/party_detail_model.dart';
 import 'package:app2_client/models/stopover_model.dart';
 import 'package:app2_client/models/location_model.dart';
+import 'package:app2_client/models/fare_input_model.dart';
+import 'package:app2_client/models/payment_info_model.dart';
 import 'package:app2_client/services/dio_client.dart';
 
 import '../models/party_member_model.dart';
@@ -267,5 +269,46 @@ class PartyService {
     return arr
         .map((e) => PartyMember.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  /// 택시비 입력 (POST /api/party/{id}/fare)
+  static Future<List<PartyPaymentModel>> submitFares({
+    required String partyId,
+    required List<FareInputModel> fares,
+    required String accessToken,
+  }) async {
+    print('💰 택시비 입력 시작 - 파티 ID: $partyId');
+    
+    try {
+      final url = "${ApiConstants.partyEndpoint}/$partyId/fare";
+      final body = fares.map((f) => f.toJson()).toList();
+      
+      print('📤 요청 데이터: $body');
+      print('📡 API 요청: $url');
+      
+      final response = await DioClient.dio.post(
+        url,
+        data: body,
+        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+      );
+      
+      print('📥 응답 상태 코드: ${response.statusCode}');
+      print('📥 응답 데이터: ${response.data}');
+      
+      if (response.statusCode != 200) {
+        throw Exception('택시비 입력 실패: ${response.statusCode}');
+      }
+      
+      final List<dynamic> arr = response.data as List<dynamic>;
+      final payments = arr
+          .map((e) => PartyPaymentModel.fromJson(e as Map<String, dynamic>))
+          .toList();
+      
+      print('✅ 택시비 입력 성공 - 결제 정보 ${payments.length}개 수신');
+      return payments;
+    } catch (e) {
+      print('❌ 택시비 입력 에러: $e');
+      throw e;
+    }
   }
 }
