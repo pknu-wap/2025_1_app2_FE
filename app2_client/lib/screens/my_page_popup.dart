@@ -14,10 +14,10 @@ class MyPagePopup {
           child: Align(
             alignment: Alignment.topRight,
             child: Padding(
-              padding: const EdgeInsets.only(top: 21, right: 5),
+              padding: const EdgeInsets.only(top: 50, right: 5),
               child: Container(
                 width: 320,
-                height: 600,
+                height: 450,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -44,8 +44,8 @@ class MyPagePopup {
                                 onTap: () => Navigator.pop(context),  // 알림 아이콘 눌렀을 때 닫기
                                 child: Image.asset(
                                   'assets/user_notify_icon.png',
-                                  width: 26,
-                                  height: 26,
+                                  width: 40,
+                                  height: 40,
                                 ),
                               ),
                             ],
