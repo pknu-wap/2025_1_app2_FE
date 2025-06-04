@@ -64,7 +64,7 @@ dependencies:
       url: https://github.com/lepitaaar/flutter_sms.git
       ref: master
 
-  overlay_support: ^2.0.1
+  overlay_support: ^2.1.0
 
 dev_dependencies:
   flutter_test:
