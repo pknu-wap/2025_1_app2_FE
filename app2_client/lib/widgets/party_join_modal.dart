@@ -79,28 +79,27 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
     final reqIdField = message.containsKey('requestId')
         ? 'requestId'
         : message.containsKey('request_id')
-        ? 'request_id'
-        : null;
+            ? 'request_id'
+            : null;
 
     final reqIdValue = reqIdField == null ? null : message[reqIdField];
     final int? parsedReqId = reqIdValue is int
         ? reqIdValue
         : (reqIdValue != null ? int.tryParse(reqIdValue.toString()) : null);
 
+    print('🔎 PENDING 메시지 파싱: status=$status, reqIdField=$reqIdField, parsedReqId=$parsedReqId');
+
     if (status == 'PENDING' && parsedReqId != null) {
-      // 서버가 PENDING으로 내려줄 때, 로컬에 request ID를 저장하고 버튼을 "취소" 모드로 변경
       setState(() {
         _pendingRequestId = parsedReqId;
         _joinStatus = 'PENDING';
       });
-      // 프론트 상태도 기억
       partyJoinPending[widget.pot.id] = true;
     } else if (status == 'APPROVED' || status == 'ACCEPTED') {
       if (!mounted) return;
       SocketService.disconnect();
       _autoDisconnectTimer?.cancel();
       Navigator.pop(context);
-      // 프론트 상태 초기화
       partyJoinPending[widget.pot.id] = false;
       setState(() => _loading = true);
       Future.delayed(Duration(milliseconds: 200), () {
@@ -119,7 +118,6 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
       SocketService.disconnect();
       _autoDisconnectTimer?.cancel();
       Navigator.pop(context);
-      // 프론트 상태 초기화
       partyJoinPending[widget.pot.id] = false;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(status == 'REJECTED' ? '참여가 거절되었습니다' : '참여 요청이 취소되었습니다')),
@@ -129,42 +127,54 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
 
   /// "팟 신청하기" 버튼 클릭 시 HTTP 호출 → 서버에서 PENDING 메시지를 STOMP로 내려줌
   Future<void> _joinParty() async {
-    try {
-      setState(() {
-        _loading = true;
-        _joinStatus = 'WAIT';
-      });
-      // 1. 소켓 연결 및 구독(이미 연결되어 있으면 생략)
-      if (!_subscribed) {
-        SocketService.connect(_accessToken!, onConnect: () {
-          SocketService.subscribeJoinRequestResponse(onMessage: _handleSocketMessage);
+    setState(() {
+      _loading = true;
+      _joinStatus = 'WAIT';
+    });
+
+    // 1. 소켓 연결 및 구독(이미 연결되어 있으면 생략)
+    if (!_subscribed) {
+      SocketService.connect(_accessToken!, onConnect: () async {
+        print('👂 구독: /user/queue/join-request-response (PartyJoinModal)');
+        SocketService.subscribeJoinRequestResponse(onMessage: (msg) {
+          print('🔔 메시지 수신: $msg');
+          try {
+            _handleSocketMessage(msg);
+          } catch (e, st) {
+            print('❌ 메시지 파싱/상태 갱신 예외: $e\n$st');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('메시지 파싱 오류: $e')),
+              );
+            }
+          }
         });
-        _subscribed = true;
-      }
-      // 2. 구독이 등록된 직후에 신청 요청 전송
-      await PartyService.attendParty(
-        partyId: widget.pot.id,
-        accessToken: _accessToken!,
-      );
-      // 이후 PENDING/ACCEPTED/REJECTED 등은 WebSocket으로 처리
-      // 프론트 상태도 기억
-      partyJoinPending[widget.pot.id] = true;
-      // 3. 5분(300초) 후 자동 해제 타이머 시작
-      _autoDisconnectTimer?.cancel();
-      _autoDisconnectTimer = Timer(const Duration(minutes: 5), () {
-        print('⏰ 5분 경과, 소켓 자동 해제');
-        SocketService.disconnect();
+
+        // 2. 구독이 등록된 직후에 신청 요청 전송
+        try {
+          await PartyService.attendParty(
+            partyId: widget.pot.id,
+            accessToken: _accessToken!,
+          );
+          print('✅ 신청 요청 전송 완료');
+          partyJoinPending[widget.pot.id] = true;
+          // 3. 5분 타이머 등은 기존대로
+          _autoDisconnectTimer?.cancel();
+          _autoDisconnectTimer = Timer(const Duration(minutes: 5), () {
+            print('⏰ 5분 경과, 소켓 자동 해제');
+            SocketService.disconnect();
+          });
+        } catch (e) {
+          print('❌ 신청 요청 전송 실패: $e');
+          if (mounted) {
+            setState(() => _joinStatus = 'IDLE');
+          }
+          partyJoinPending[widget.pot.id] = false;
+        } finally {
+          if (mounted) setState(() => _loading = false);
+        }
       });
-    } catch (e) {
-      showSimpleNotification(
-        Text('참가 실패: $e'),
-        background: Colors.red,
-        position: NotificationPosition.top,
-      );
-      setState(() => _joinStatus = 'IDLE');
-      partyJoinPending[widget.pot.id] = false;
-    } finally {
-      if (mounted) setState(() => _loading = false);
+      _subscribed = true;
     }
   }
 
