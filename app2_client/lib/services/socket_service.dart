@@ -17,7 +17,7 @@ class SocketService {
   static StompClient? _client;
   static bool _connected = false;
 
-  /// “순수 WebSocket”으로 STOMP 연결할 URL을 만들어 줍니다.
+  /// "순수 WebSocket"으로 STOMP 연결할 URL을 만들어 줍니다.
   /// 예) BACKEND_BASE_URL이 "http://3.105.16.234:8080" 이라면,
   ///     "ws://3.105.16.234:8080/ws?token={accessToken}" 로 업그레이드 시도합니다.
   static String _webSocketUrl(String token) {
@@ -146,6 +146,37 @@ class SocketService {
       },
     );
     print('👂 구독: /user/queue/join-request-response');
+  }
+
+  /// 호스트용 참여 요청 구독 (새로운 참여 요청 알림)
+  ///
+  /// 메시지 예시:
+  ///   {
+  ///     "type": "JOIN_REQUEST",
+  ///     "request_id": 123,
+  ///     "name": "김철수",
+  ///     "email": "kim@example.com",
+  ///     "partyId": 1
+  ///   }
+  static void subscribeJoinRequests({
+    required void Function(Map<String, dynamic> message) onMessage,
+  }) {
+    if (!_connected || _client == null) {
+      print('⚠️ subscribeJoinRequests: STOMP 클라이언트가 연결되지 않았습니다.');
+      return;
+    }
+    _client!.subscribe(
+      destination: '/user/queue/join-requests',
+      callback: (StompFrame frame) {
+        if (frame.body != null) {
+          final data = json.decode(frame.body!);
+          if (data is Map<String, dynamic>) {
+            onMessage(data);
+          }
+        }
+      },
+    );
+    print('👂 구독: /user/queue/join-requests');
   }
 
   /// 연결 종료

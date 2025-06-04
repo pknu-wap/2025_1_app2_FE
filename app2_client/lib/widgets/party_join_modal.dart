@@ -135,14 +135,30 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
       // 이후 PENDING/ACCEPTED/REJECTED/… 은 WebSocket으로 처리
     } on DioException catch (e) {
       if (e.response?.statusCode == 409) {
-        showSimpleNotification(
-          const Text('이미 참여중인 파티입니다.'),
-          background: Colors.red,
-          position: NotificationPosition.top,
-        );
+        // 409 에러의 경우 응답 메시지를 확인하여 구체적인 이유를 파악
+        final errorMessage = e.response?.data?.toString() ?? '';
+        if (errorMessage.contains('이미 신청')) {
+          showSimpleNotification(
+            const Text('이미 신청을 하였습니다.'),
+            background: Colors.orange,
+            position: NotificationPosition.top,
+          );
+        } else if (errorMessage.contains('이미 참여')) {
+          showSimpleNotification(
+            const Text('이미 참여중인 파티입니다.'),
+            background: Colors.red,
+            position: NotificationPosition.top,
+          );
+        } else {
+          showSimpleNotification(
+            const Text('중복 요청입니다.'),
+            background: Colors.orange,
+            position: NotificationPosition.top,
+          );
+        }
       } else {
         showSimpleNotification(
-          Text('참가 실패: $e'),
+          Text('참가 실패: ${e.response?.statusMessage ?? e.message}'),
           background: Colors.red,
           position: NotificationPosition.top,
         );

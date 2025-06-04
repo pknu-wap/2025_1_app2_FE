@@ -68,9 +68,9 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
 
     SocketService.connect(token, onConnect: () {
       if (!_socketSubscribed) {
-        // 1) 호스트에게 날아오는 "참여 요청 응답" (PENDING, APPROVED, REJECTED, CANCELED)
-        SocketService.subscribeJoinRequestResponse(onMessage: (msg) {
-          // msg 안에 type이 "JOIN_REQUEST"인 경우엔 새 요청 정보를 _joinRequests에 추가
+        // 1) 호스트에게 날아오는 새로운 참여 요청 알림
+        SocketService.subscribeJoinRequests(onMessage: (msg) {
+          // 새로운 참여 요청이 오면 _joinRequests에 추가
           if (msg['type'] == 'JOIN_REQUEST') {
             setState(() {
               _joinRequests.add(JoinRequest.fromJson(msg));
