@@ -99,22 +99,18 @@ class PartyService {
     required String partyId,
     required String accessToken,
   }) async {
-    // WebSocket으로 참여 요청 전송
-    if (SocketService.client == null || !SocketService.connected) {
-      throw Exception('WebSocket이 연결되지 않았습니다.');
-    }
-
+    final url = "${ApiConstants.partyEndpoint}/$partyId/attend";
     try {
-      SocketService.client!.send(
-        destination: '/app/party/attend',  // 서버 로그에 맞게 수정
-        body: json.encode({
-          'partyId': int.parse(partyId),  // 숫자로 변환
-          'accessToken': accessToken,
-        }),
+      final response = await DioClient.dio.post(
+        url,
+        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
       );
-      print('📤 WebSocket으로 참여 요청 전송: /app/party/attend');
+      if (response.statusCode != 200) {
+        throw Exception('파티 참여 실패: \\${response.data}');
+      }
+    } on DioException catch (e) {
+      throw e;
     } catch (e) {
-      print('❌ WebSocket 참여 요청 실패: $e');
       throw Exception('파티 참여 실패: $e');
     }
   }
