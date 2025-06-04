@@ -24,6 +24,9 @@ class PartyJoinModal extends StatefulWidget {
   State<PartyJoinModal> createState() => _PartyJoinModalState();
 }
 
+// 파티별 참여 요청 상태를 기억하는 전역 Map
+final Map<String, bool> partyJoinPending = {};
+
 class _PartyJoinModalState extends State<PartyJoinModal> {
   String? _accessToken;
   bool _loading = false;
@@ -68,6 +71,13 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
       });
       _subscribed = true;
     }
+
+    // 모달이 열릴 때 프론트 상태로 참여 요청 중인지 확인
+    if (partyJoinPending[widget.pot.id] == true) {
+      setState(() {
+        _joinStatus = 'PENDING';
+      });
+    }
   }
 
   /// STOMP 메시지 수신 처리
@@ -90,33 +100,34 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
         _pendingRequestId = parsedReqId;
         _joinStatus = 'PENDING';
       });
+      // 프론트 상태도 기억
+      partyJoinPending[widget.pot.id] = true;
     } else if (status == 'APPROVED' || status == 'ACCEPTED') {
       // 서버가 최종 승인(ACCEPTED) 상태를 내려주면 바로 모달 닫고 파티 화면으로 이동
       if (!mounted) return;
       Navigator.pop(context);
+      // 프론트 상태 초기화
+      partyJoinPending[widget.pot.id] = false;
       setState(() => _loading = true);
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => AttendeePartyScreen(partyId: widget.pot.id),
-        ),
-      );
-
-      if (mounted) setState(() => _loading = false);
-    } else if (status == 'REJECTED') {
-      // 서버에서 거절 상태를 내려주면 모달 닫고 스낵바 띄우기
+      Future.delayed(Duration(milliseconds: 200), () {
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => AttendeePartyScreen(partyId: widget.pot.id),
+            ),
+          );
+          setState(() => _loading = false);
+        }
+      });
+    } else if (status == 'REJECTED' || status == 'CANCELED') {
+      // 서버에서 거절/취소 상태를 내려주면 모달 닫고 스낵바 띄우기
       if (!mounted) return;
       Navigator.pop(context);
+      // 프론트 상태 초기화
+      partyJoinPending[widget.pot.id] = false;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('참여가 거절되었습니다')),
-      );
-    } else if (status == 'CANCELED') {
-      // 서버에서 취소 상태를 내려주면 모달 닫고 스낵바 띄우기
-      if (!mounted) return;
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('참여 요청이 취소되었습니다')),
+        SnackBar(content: Text(status == 'REJECTED' ? '참여가 거절되었습니다' : '참여 요청이 취소되었습니다')),
       );
     }
   }
@@ -133,21 +144,41 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
         accessToken: _accessToken!,
       );
       // 이후 PENDING/ACCEPTED/REJECTED/… 은 WebSocket으로 처리
+      // 프론트 상태도 기억
+      partyJoinPending[widget.pot.id] = true;
     } on DioException catch (e) {
       if (e.response?.statusCode == 409) {
-        showSimpleNotification(
-          const Text('이미 참여중인 파티입니다.'),
-          background: Colors.red,
-          position: NotificationPosition.top,
-        );
+        // 409 에러의 경우 응답 메시지를 확인하여 구체적인 이유를 파악
+        final errorMessage = e.response?.data?.toString() ?? '';
+        if (errorMessage.contains('이미 신청')) {
+          showSimpleNotification(
+            const Text('이미 신청을 하였습니다.'),
+            background: Colors.orange,
+            position: NotificationPosition.top,
+          );
+        } else if (errorMessage.contains('이미 참여')) {
+          showSimpleNotification(
+            const Text('이미 참여중인 파티입니다.'),
+            background: Colors.red,
+            position: NotificationPosition.top,
+          );
+        } else {
+          showSimpleNotification(
+            const Text('중복 요청입니다.'),
+            background: Colors.orange,
+            position: NotificationPosition.top,
+          );
+        }
       } else {
         showSimpleNotification(
-          Text('참가 실패: $e'),
+          Text('참가 실패: ${e.response?.statusMessage ?? e.message}'),
           background: Colors.red,
           position: NotificationPosition.top,
         );
       }
       setState(() => _joinStatus = 'IDLE');
+      // 에러 발생 시 프론트 상태도 초기화
+      partyJoinPending[widget.pot.id] = false;
     } catch (e) {
       showSimpleNotification(
         Text('참가 실패: $e'),
@@ -155,6 +186,7 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
         position: NotificationPosition.top,
       );
       setState(() => _joinStatus = 'IDLE');
+      partyJoinPending[widget.pot.id] = false;
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -176,6 +208,7 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
         accessToken: _accessToken!,
       );
       // 이후 CANCELED 메시지는 WebSocket으로 처리
+      // 프론트 상태도 초기화는 메시지 수신에서 처리
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('참여 요청 취소 실패: $e')),

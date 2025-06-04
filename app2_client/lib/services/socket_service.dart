@@ -1,10 +1,15 @@
 // lib/services/socket_service.dart
 
 import 'dart:convert';
+import 'dart:io';
+
+import 'package:app2_client/constants/api_constants.dart';
+import 'package:app2_client/services/dio_client.dart';
+import 'package:app2_client/services/secure_storage_service.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:stomp_dart_client/stomp.dart';
 import 'package:stomp_dart_client/stomp_config.dart';
 import 'package:stomp_dart_client/stomp_frame.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 /// SocketService: STOMP over WebSocket 연결용 헬퍼 클래스
 /// - 백엔드(Spring)가 registerStompEndpoints("/ws").withSockJS() 로 열어 두었다면,
@@ -16,8 +21,11 @@ class SocketService {
 
   static StompClient? _client;
   static bool _connected = false;
+  static bool _isReissuing = false;  // 토큰 재발급 중인지 상태 추적
+  static String? _lastToken;
+  static void Function()? _onConnectCallback;
 
-  /// “순수 WebSocket”으로 STOMP 연결할 URL을 만들어 줍니다.
+  /// "순수 WebSocket"으로 STOMP 연결할 URL을 만들어 줍니다.
   /// 예) BACKEND_BASE_URL이 "http://3.105.16.234:8080" 이라면,
   ///     "ws://3.105.16.234:8080/ws?token={accessToken}" 로 업그레이드 시도합니다.
   static String _webSocketUrl(String token) {
@@ -32,9 +40,17 @@ class SocketService {
     return '$wsBase/ws?token=$token';
   }
 
+  static bool get isConnected => _connected;
+
   /// STOMP over WebSocket 연결 수행
   static void connect(String token, {void Function()? onConnect}) {
-    if (_connected) return;
+    // 토큰이 바뀌었거나, 연결이 끊겼으면 무조건 재연결
+    if (_connected && _lastToken == token) {
+      print('⚠️ 이미 연결되어 있음, 재연결 생략');
+      return;
+    }
+    _lastToken = token;
+    _onConnectCallback = onConnect;
 
     final url = _webSocketUrl(token);
     print('🔌 STOMP(WebSocket) 접속 시도 → $url');
@@ -46,14 +62,56 @@ class SocketService {
         onConnect: (StompFrame frame) {
           _connected = true;
           print('✅ STOMP/WebSocket 연결 성공 (URL: $url)');
-          if (onConnect != null) onConnect();
+          if (_onConnectCallback != null) _onConnectCallback!();
         },
         onWebSocketError: (dynamic error) {
+          _connected = false;
           print('❌ WebSocket 오류: $error');
+          // 토큰 만료(403) 등은 기존 로직 유지
+          if (error is WebSocketException && error.httpStatusCode == 403) {
+            if (_isReissuing) {
+              print('⚠️ 이미 토큰 재발급 중: 중복 요청 무시');
+              return;
+            }
+            print('🔑 WebSocket 403 에러: 토큰 재발급 시도');
+            _isReissuing = true;
+            _client?.deactivate();
+            SecureStorageService().getRefreshToken().then((refreshToken) {
+              return DioClient.dio.post(
+                ApiConstants.reissueEndPoint,
+                data: {'refreshToken': refreshToken},
+              );
+            }).then((response) async {
+              final newAccessToken = response.data['accessToken'];
+              final newRefreshToken = response.data['refreshToken'];
+              await SecureStorageService().saveTokens(
+                accessToken: newAccessToken,
+                refreshToken: newRefreshToken,
+              );
+              if (newAccessToken != null) {
+                connect(newAccessToken, onConnect: _onConnectCallback);
+              }
+            }).catchError((e) {
+              print('❌ 토큰 재발급 실패: $e');
+            }).whenComplete(() {
+              _isReissuing = false;
+            });
+          } else {
+            // 기타 에러는 2초 후 재연결 시도
+            Future.delayed(Duration(seconds: 2), () {
+              print('🔄 WebSocket 재연결 시도');
+              if (_lastToken != null) connect(_lastToken!, onConnect: _onConnectCallback);
+            });
+          }
         },
         onDisconnect: (StompFrame frame) {
           _connected = false;
           print('🔌 STOMP/WebSocket 연결 종료');
+          // 연결이 끊기면 자동 재연결 시도
+          Future.delayed(Duration(seconds: 2), () {
+            print('🔄 WebSocket 재연결 시도');
+            if (_lastToken != null) connect(_lastToken!, onConnect: _onConnectCallback);
+          });
         },
         onStompError: (StompFrame frame) {
           print('⚠️ STOMP 오류: ${frame.body}');
@@ -146,6 +204,37 @@ class SocketService {
       },
     );
     print('👂 구독: /user/queue/join-request-response');
+  }
+
+  /// 호스트용 참여 요청 구독 (새로운 참여 요청 알림)
+  ///
+  /// 메시지 예시:
+  ///   {
+  ///     "type": "JOIN_REQUEST",
+  ///     "request_id": 123,
+  ///     "name": "김철수",
+  ///     "email": "kim@example.com",
+  ///     "partyId": 1
+  ///   }
+  static void subscribeJoinRequests({
+    required void Function(Map<String, dynamic> message) onMessage,
+  }) {
+    if (!_connected || _client == null) {
+      print('⚠️ subscribeJoinRequests: STOMP 클라이언트가 연결되지 않았습니다.');
+      return;
+    }
+    _client!.subscribe(
+      destination: '/user/queue/join-requests',
+      callback: (StompFrame frame) {
+        if (frame.body != null) {
+          final data = json.decode(frame.body!);
+          if (data is Map<String, dynamic>) {
+            onMessage(data);
+          }
+        }
+      },
+    );
+    print('👂 구독: /user/queue/join-requests');
   }
 
   /// 연결 종료

@@ -51,7 +51,10 @@ class LoginScreen extends StatelessWidget {
                   elevation: 1,
                   onPressed: () async {
                     final result = await auth.login();
-                    if (result == 'SUCCESS') {
+                    if (result == null) {
+                      // 로그인 취소 시 아무 동작도 하지 않음
+                      return;
+                    } else if (result == 'SUCCESS') {
                       // ✅ accessToken 저장
                       final prefs = await SharedPreferences.getInstance();
                       await prefs.setString('accessToken', auth.tokens!.accessToken);
