@@ -22,6 +22,8 @@ class SocketService {
   static StompClient? _client;
   static bool _connected = false;
   static bool _isReissuing = false;  // 토큰 재발급 중인지 상태 추적
+  static String? _lastToken;
+  static void Function()? _onConnectCallback;
 
   /// "순수 WebSocket"으로 STOMP 연결할 URL을 만들어 줍니다.
   /// 예) BACKEND_BASE_URL이 "http://3.105.16.234:8080" 이라면,
@@ -38,13 +40,17 @@ class SocketService {
     return '$wsBase/ws?token=$token';
   }
 
+  static bool get isConnected => _connected;
+
   /// STOMP over WebSocket 연결 수행
   static void connect(String token, {void Function()? onConnect}) {
-    if (_connected) return;
-    if (_isReissuing) {
-      print('⚠️ 토큰 재발급 중: 연결 시도 무시');
+    // 토큰이 바뀌었거나, 연결이 끊겼으면 무조건 재연결
+    if (_connected && _lastToken == token) {
+      print('⚠️ 이미 연결되어 있음, 재연결 생략');
       return;
     }
+    _lastToken = token;
+    _onConnectCallback = onConnect;
 
     final url = _webSocketUrl(token);
     print('🔌 STOMP(WebSocket) 접속 시도 → $url');
@@ -56,25 +62,20 @@ class SocketService {
         onConnect: (StompFrame frame) {
           _connected = true;
           print('✅ STOMP/WebSocket 연결 성공 (URL: $url)');
-          if (onConnect != null) onConnect();
+          if (_onConnectCallback != null) _onConnectCallback!();
         },
         onWebSocketError: (dynamic error) {
+          _connected = false;
+          print('❌ WebSocket 오류: $error');
+          // 토큰 만료(403) 등은 기존 로직 유지
           if (error is WebSocketException && error.httpStatusCode == 403) {
             if (_isReissuing) {
               print('⚠️ 이미 토큰 재발급 중: 중복 요청 무시');
               return;
             }
-            
             print('🔑 WebSocket 403 에러: 토큰 재발급 시도');
             _isReissuing = true;
-            
-            // 즉시 소켓 연결 종료
-            if (_client != null) {
-              _client!.deactivate();
-              _connected = false;
-            }
-
-            // TokenInterceptor를 사용하지 않고, dio로 직접 reissue 엔드포인트에 요청하여 토큰 재발급
+            _client?.deactivate();
             SecureStorageService().getRefreshToken().then((refreshToken) {
               return DioClient.dio.post(
                 ApiConstants.reissueEndPoint,
@@ -83,29 +84,34 @@ class SocketService {
             }).then((response) async {
               final newAccessToken = response.data['accessToken'];
               final newRefreshToken = response.data['refreshToken'];
-              
-              // SecureStorage에 새 토큰 저장
               await SecureStorageService().saveTokens(
                 accessToken: newAccessToken,
                 refreshToken: newRefreshToken,
               );
-              
-              // 토큰 재발급 완료 후 재연결
               if (newAccessToken != null) {
-                connect(newAccessToken);
+                connect(newAccessToken, onConnect: _onConnectCallback);
               }
             }).catchError((e) {
               print('❌ 토큰 재발급 실패: $e');
             }).whenComplete(() {
-              _isReissuing = false;  // 재발급 상태 초기화
+              _isReissuing = false;
             });
           } else {
-            print('❌ WebSocket 오류: $error');
+            // 기타 에러는 2초 후 재연결 시도
+            Future.delayed(Duration(seconds: 2), () {
+              print('🔄 WebSocket 재연결 시도');
+              if (_lastToken != null) connect(_lastToken!, onConnect: _onConnectCallback);
+            });
           }
         },
         onDisconnect: (StompFrame frame) {
           _connected = false;
           print('🔌 STOMP/WebSocket 연결 종료');
+          // 연결이 끊기면 자동 재연결 시도
+          Future.delayed(Duration(seconds: 2), () {
+            print('🔄 WebSocket 재연결 시도');
+            if (_lastToken != null) connect(_lastToken!, onConnect: _onConnectCallback);
+          });
         },
         onStompError: (StompFrame frame) {
           print('⚠️ STOMP 오류: ${frame.body}');
