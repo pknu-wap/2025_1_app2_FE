@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:app2_client/models/stopover_model.dart';
 import 'package:app2_client/services/party_service.dart';
+import 'package:app2_client/services/payment_service.dart';
 import 'package:app2_client/services/socket_service.dart';
 import 'package:provider/provider.dart';
 import 'package:app2_client/providers/auth_provider.dart';
+import 'package:app2_client/models/payment_info_model.dart';
 
 class TaxiFarePage extends StatefulWidget {
   final String partyId;
@@ -29,6 +31,8 @@ class _TaxiFarePageState extends State<TaxiFarePage> {
   late Map<int, List<String>> approvals;
   Map<int, String?> fareInputs = {};
   bool _socketSubscribed = false;
+  List<PaymentMemberInfo>? _paymentInfo;
+  bool _isBookkeeper = false;
 
   String maskName(String name) {
     if (name.length <= 1) return name;
@@ -40,6 +44,15 @@ class _TaxiFarePageState extends State<TaxiFarePage> {
     super.initState();
     _initializeData();
     _connectAndSubscribe();
+    _checkBookkeeperRole();
+  }
+
+  void _checkBookkeeperRole() {
+    final currentUser = widget.stopoverList
+        .expand((s) => s.partyMembers)
+        .firstWhere((m) => m.email == widget.currentUserEmail);
+    _isBookkeeper = currentUser.role == 'BOOKKEEPER' || 
+                    (currentUser.role == 'HOST' && currentUser.additionalRole == 'BOOKKEEPER');
   }
 
   void _initializeData() {
@@ -160,6 +173,45 @@ class _TaxiFarePageState extends State<TaxiFarePage> {
     });
   }
 
+  Future<void> confirmPayment(int groupNumber, String memberName) async {
+    final token = Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
+    if (token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('로그인이 필요합니다.')));
+      return;
+    }
+
+    if (!_isBookkeeper) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('정산자(BOOKKEEPER) 권한이 필요합니다.')),
+      );
+      return;
+    }
+
+    try {
+      final stopover = widget.stopoverList[groupNumber - 1];
+      final member = stopover.partyMembers.firstWhere((m) => m.name == memberName);
+      
+      final result = await PaymentService.confirmPayment(
+        partyId: widget.partyId,
+        partyMemberId: member.id,
+        stopoverId: stopover.stopover.id,
+        accessToken: token,
+      );
+
+      setState(() {
+        _paymentInfo = result;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('요금 승인이 완료되었습니다.')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('요금 승인 처리 중 오류가 발생했습니다: $e')),
+      );
+    }
+  }
+
   @override
   void dispose() {
     _fareController.dispose();
@@ -186,36 +238,56 @@ class _TaxiFarePageState extends State<TaxiFarePage> {
       body: Column(
         children: [
           const SizedBox(height: 20),
+          if (_isBookkeeper)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                '정산자(BOOKKEEPER) 권한으로 요금 승인이 가능합니다.',
+                style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+              ),
+            ),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 20),
             child: Column(
               children: [
                 Text(
-                  '하차 시, 그 지점까지의 택시 미터기 요금을 입력해주세요.\n그 때 탑승하고 있던 모든 사람들의 동의를 받아야 합니다.\n만약, 금액이 모두 입력되지 않았거나,\n모두 동의하지 않은 경우에는 거리 비율로 정산됩니다..',
+                  '하차 시, 그 지점까지의 택시 미터기 요금을 입력해주세요.\n그 때 탑승하고 있던 모든 사람들의 동의를 받아야 합니다.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 13),
                 ),
-                SizedBox(height: 10),
-                Text('타당한 요금 정산을 위해 꼭 입력해주세요 !', style: TextStyle(fontSize: 13, color: Colors.black54)),
               ],
             ),
           ),
-          const SizedBox(height: 60),
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(2, 4))],
-            ),
-            child: Column(
-              children: passengers.keys.map((group) {
-                final names = passengers[group]!;
-                final approved = approvals[group]!;
-                final color = [Colors.amber, Colors.green, Colors.blue][group - 1];
-                return buildPassengerRow(group, names, approved, color);
-              }).toList(),
+          const SizedBox(height: 20),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              children: [
+                if (_paymentInfo != null) ...[
+                  const Text('결제 현황', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  ..._paymentInfo!.map((info) => Card(
+                    child: ListTile(
+                      title: Text(info.memberInfo.name),
+                      subtitle: Text(
+                        '기본요금: ${info.paymentInfo.baseFare}원\n'
+                        '최종요금: ${info.paymentInfo.finalFare}원'
+                      ),
+                      trailing: Icon(
+                        info.paymentInfo.isPaid ? Icons.check_circle : Icons.pending,
+                        color: info.paymentInfo.isPaid ? Colors.green : Colors.orange,
+                      ),
+                    ),
+                  )).toList(),
+                  const SizedBox(height: 20),
+                ],
+                ...passengers.keys.map((group) {
+                  final names = passengers[group]!;
+                  final approved = approvals[group]!;
+                  final color = [Colors.amber, Colors.green, Colors.blue][group - 1];
+                  return buildPassengerRow(group, names, approved, color);
+                }).toList(),
+              ],
             ),
           ),
         ],
@@ -226,89 +298,98 @@ class _TaxiFarePageState extends State<TaxiFarePage> {
   Widget buildPassengerRow(int group, List<String> names, List<String> approvers, Color color) {
     final isMine = isMyGroup(group);
     final hasInput = fareInputs[group] != null;
-    final needsApproval = passengers.entries
-        .where((e) => e.key > group)
-        .expand((e) => e.value)
-        .contains(myName);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Image.asset('assets/icons/marker_$group.png', width: 28, height: 32),
-          const SizedBox(width: 1),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            color: Colors.white,
-            child: Text(names.map(maskName).join(', '), style: const TextStyle(fontWeight: FontWeight.bold)),
-          ),
-          const SizedBox(width: 4),
-          if (isMine && !hasInput)
-            Container(
-              padding: const EdgeInsets.only(left: 15, top: 3, right: 3, bottom: 3),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(
-                    width: 40,
-                    height: 20,
-                    child: TextField(
-                      controller: _fareController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        hintText: '요금',
-                        border: UnderlineInputBorder(),
-                        isDense: true,
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Image.asset('assets/icons/marker_$group.png', width: 28, height: 32),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        names.map((name) => maskName(name)).join(', '),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
-                      style: const TextStyle(fontSize: 10),
-                    ),
+                      if (hasInput)
+                        Text(
+                          '입력된 요금: ${fareInputs[group]}원',
+                          style: const TextStyle(color: Colors.blue),
+                        ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    height: 30,
-                    width: 30,
-                    child: ElevatedButton(
+                ),
+              ],
+            ),
+            if (_isBookkeeper && hasInput)
+              Wrap(
+                spacing: 8,
+                children: names.map((name) {
+                  final memberInfo = _paymentInfo?.firstWhere(
+                    (info) => info.memberInfo.name == name,
+                    orElse: () => PaymentMemberInfo(
+                      memberInfo: PartyMemberInfo(
+                        id: 0,
+                        name: name,
+                        email: '',
+                        gender: '',
+                        role: '',
+                        additionalRole: '',
+                      ),
+                      paymentInfo: PaymentInfo(
+                        stopoverId: 0,
+                        baseFare: 0,
+                        finalFare: 0,
+                        isPaid: false,
+                      ),
+                    ),
+                  );
+
+                  final isPaid = memberInfo?.paymentInfo.isPaid ?? false;
+
+                  return ActionChip(
+                    label: Text(maskName(name)),
+                    avatar: Icon(
+                      isPaid ? Icons.check_circle : Icons.pending,
+                      color: isPaid ? Colors.green : Colors.orange,
+                      size: 18,
+                    ),
+                    onPressed: isPaid ? null : () => confirmPayment(group, name),
+                  );
+                }).toList(),
+              ),
+            if (isMine && !hasInput)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _fareController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          hintText: '요금을 입력하세요',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
                       onPressed: () => submitFare(group),
-                      style: ElevatedButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                        elevation: 0,
-                      ),
-                      child: const Text('입력', style: TextStyle(fontSize: 9, color: Colors.black)),
+                      child: const Text('입력'),
                     ),
-                  ),
-                ],
-              ),
-            )
-          else if (hasInput) ...[
-            Text('${fareInputs[group]} 원', style: const TextStyle(fontSize: 13)),
-            if (needsApproval && !approvers.contains(myName))
-              IconButton(
-                icon: const Icon(Icons.check_circle_outline, size: 20),
-                onPressed: () => approveFare(group),
-                color: Colors.green,
+                  ],
+                ),
               ),
           ],
-          const Spacer(),
-          Wrap(
-            spacing: 6,
-            children: approvers.map((name) {
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 5),
-                decoration: BoxDecoration(
-                  border: Border.all(color: color, width: 1.5),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(maskName(name), style: TextStyle(color: color, fontSize: 12)),
-              );
-            }).toList(),
-          ),
-        ],
+        ),
       ),
     );
   }
