@@ -639,9 +639,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                   const Text('파티원 목록',
                       style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
-                  ..._party.members
-                      .where((m) => m.status == null || m.status == 'ACCEPTED')
-                      .map((m) {
+                  ..._party.members.map((m) {
                     final isBookkeeper =
                         m.role == 'BOOKKEEPER' || m.additionalRole == 'BOOKKEEPER';
                     return Card(
