@@ -707,7 +707,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('🔧 디버그 정보', 
+                        Text('🔧 디버그 정보',
                             style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
                         Text('참여 요청 개수: ${_joinRequests.length}'),
                         Text('파티 ID: ${_party.partyId}'),

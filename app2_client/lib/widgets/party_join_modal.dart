@@ -11,6 +11,7 @@ import '../services/socket_service.dart';
 import 'package:dio/dio.dart';
 import 'package:app2_client/main.dart'; // navigatorKey import
 import 'package:overlay_support/overlay_support.dart';
+import 'dart:async';
 
 /// 파티 참여 모달 (팟 신청하기)
 /// - STOMP 연결 후 "/user/queue/join-request-response" 개인 응답 채널을 구독
@@ -31,6 +32,7 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
   String? _accessToken;
   bool _loading = false;
   bool _subscribed = false;
+  Timer? _autoDisconnectTimer;
 
   /// 서버가 내려주는 "요청 ID"를 로컬에 저장해 두면, 취소 시에 사용
   int? _pendingRequestId;
@@ -61,15 +63,6 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
         );
       });
       return;
-    }
-
-    // 2) 아직 STOMP 구독을 하지 않았다면, 연결 후 구독 수행
-    if (!_subscribed) {
-      SocketService.connect(_accessToken!, onConnect: () {
-        // 개인 응답 채널 구독: "/user/queue/join-request-response"
-        SocketService.subscribeJoinRequestResponse(onMessage: _handleSocketMessage);
-      });
-      _subscribed = true;
     }
 
     // 모달이 열릴 때 프론트 상태로 참여 요청 중인지 확인
@@ -103,8 +96,9 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
       // 프론트 상태도 기억
       partyJoinPending[widget.pot.id] = true;
     } else if (status == 'APPROVED' || status == 'ACCEPTED') {
-      // 서버가 최종 승인(ACCEPTED) 상태를 내려주면 바로 모달 닫고 파티 화면으로 이동
       if (!mounted) return;
+      SocketService.disconnect();
+      _autoDisconnectTimer?.cancel();
       Navigator.pop(context);
       // 프론트 상태 초기화
       partyJoinPending[widget.pot.id] = false;
@@ -121,8 +115,9 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
         }
       });
     } else if (status == 'REJECTED' || status == 'CANCELED') {
-      // 서버에서 거절/취소 상태를 내려주면 모달 닫고 스낵바 띄우기
       if (!mounted) return;
+      SocketService.disconnect();
+      _autoDisconnectTimer?.cancel();
       Navigator.pop(context);
       // 프론트 상태 초기화
       partyJoinPending[widget.pot.id] = false;
@@ -139,46 +134,27 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
         _loading = true;
         _joinStatus = 'WAIT';
       });
+      // 1. 소켓 연결 및 구독(이미 연결되어 있으면 생략)
+      if (!_subscribed) {
+        SocketService.connect(_accessToken!, onConnect: () {
+          SocketService.subscribeJoinRequestResponse(onMessage: _handleSocketMessage);
+        });
+        _subscribed = true;
+      }
+      // 2. 구독이 등록된 직후에 신청 요청 전송
       await PartyService.attendParty(
         partyId: widget.pot.id,
         accessToken: _accessToken!,
       );
-      // 이후 PENDING/ACCEPTED/REJECTED/… 은 WebSocket으로 처리
+      // 이후 PENDING/ACCEPTED/REJECTED 등은 WebSocket으로 처리
       // 프론트 상태도 기억
       partyJoinPending[widget.pot.id] = true;
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 409) {
-        // 409 에러의 경우 응답 메시지를 확인하여 구체적인 이유를 파악
-        final errorMessage = e.response?.data?.toString() ?? '';
-        if (errorMessage.contains('이미 신청')) {
-          showSimpleNotification(
-            const Text('이미 신청을 하였습니다.'),
-            background: Colors.orange,
-            position: NotificationPosition.top,
-          );
-        } else if (errorMessage.contains('이미 참여')) {
-          showSimpleNotification(
-            const Text('이미 참여중인 파티입니다.'),
-            background: Colors.red,
-            position: NotificationPosition.top,
-          );
-        } else {
-          showSimpleNotification(
-            const Text('중복 요청입니다.'),
-            background: Colors.orange,
-            position: NotificationPosition.top,
-          );
-        }
-      } else {
-        showSimpleNotification(
-          Text('참가 실패: ${e.response?.statusMessage ?? e.message}'),
-          background: Colors.red,
-          position: NotificationPosition.top,
-        );
-      }
-      setState(() => _joinStatus = 'IDLE');
-      // 에러 발생 시 프론트 상태도 초기화
-      partyJoinPending[widget.pot.id] = false;
+      // 3. 5분(300초) 후 자동 해제 타이머 시작
+      _autoDisconnectTimer?.cancel();
+      _autoDisconnectTimer = Timer(const Duration(minutes: 5), () {
+        print('⏰ 5분 경과, 소켓 자동 해제');
+        SocketService.disconnect();
+      });
     } catch (e) {
       showSimpleNotification(
         Text('참가 실패: $e'),
@@ -220,7 +196,8 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
 
   @override
   void dispose() {
-    SocketService.disconnect();
+    _autoDisconnectTimer?.cancel();
+    // SocketService.disconnect(); // 해제는 응답/타이머에서만!
     super.dispose();
   }
 
