@@ -193,4 +193,7 @@ class SocketService {
     _connected = false;
     print('🔌 STOMP(WebSocket) 연결 해제');
   }
+
+  static StompClient? get client => _client;
+  static bool get connected => _connected;
 }
