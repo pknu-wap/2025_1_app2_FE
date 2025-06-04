@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:app2_client/models/stopover_model.dart';
-import 'package:app2_client/models/party_member_model.dart';
 import 'package:app2_client/services/party_service.dart';
 import 'package:app2_client/services/socket_service.dart';
 import 'package:provider/provider.dart';
@@ -31,6 +30,11 @@ class _TaxiFarePageState extends State<TaxiFarePage> {
   Map<int, String?> fareInputs = {};
   bool _socketSubscribed = false;
 
+  String maskName(String name) {
+    if (name.length <= 1) return name;
+    return name[0] + '*' + name.substring(name.length - 1);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -39,79 +43,59 @@ class _TaxiFarePageState extends State<TaxiFarePage> {
   }
 
   void _initializeData() {
-    // 현재 사용자 이름 찾기
     final currentUser = widget.stopoverList
         .expand((s) => s.partyMembers)
         .firstWhere((m) => m.email == widget.currentUserEmail);
     myName = currentUser.name;
 
-    // 모든 사용자 목록
     allUsers = widget.stopoverList
         .expand((s) => s.partyMembers)
         .map((m) => m.name)
         .toSet()
         .toList();
 
-    // 경유지별 탑승자 목록
     passengers = {};
     for (int i = 0; i < widget.stopoverList.length; i++) {
-      final stopover = widget.stopoverList[i];
-      passengers[i + 1] = stopover.partyMembers.map((m) => m.name).toList();
+      passengers[i + 1] = widget.stopoverList[i].partyMembers.map((m) => m.name).toList();
     }
 
-    // 초기 승인 목록 (빈 상태로 시작)
-    approvals = {};
-    for (int i = 1; i <= widget.stopoverList.length; i++) {
-      approvals[i] = [];
-    }
-
-    // 요금 입력 초기화
-    for (var group in passengers.keys) {
-      fareInputs[group] = null;
-    }
+    approvals = { for (int i = 1; i <= widget.stopoverList.length; i++) i: [] };
+    fareInputs = { for (var group in passengers.keys) group: null };
   }
 
   void submitFare(int groupNumber) async {
     final input = int.tryParse(_fareController.text);
-    if (input != null) {
-      final token = Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
-      if (token == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('로그인이 필요합니다.')),
-        );
-        return;
-      }
+    if (input == null) return;
 
-      try {
-        await PartyService.submitFare(
-          partyId: widget.partyId,
-          stopoverId: widget.stopoverList[groupNumber - 1].stopover.id,
-          fare: input,
-          accessToken: token,
-        );
+    final token = Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
+    if (token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('로그인이 필요합니다.')));
+      return;
+    }
 
-        setState(() {
-          fareInputs[groupNumber] = input.toString();
-          _fareController.clear();
-        });
+    try {
+      await PartyService.submitFare(
+        partyId: widget.partyId,
+        stopoverId: widget.stopoverList[groupNumber - 1].stopover.id,
+        fare: input,
+        accessToken: token,
+      );
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('요금이 입력되었습니다.')),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('요금 입력 실패: $e')),
-        );
-      }
+      setState(() {
+        fareInputs[groupNumber] = input.toString();
+        _fareController.clear();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('요금이 입력되었습니다.')));
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('요금 입력 실패: $e')));
     }
   }
 
   Future<void> approveFare(int groupNumber) async {
     final token = Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
     if (token == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('로그인이 필요합니다.')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('로그인이 필요합니다.')));
       return;
     }
 
@@ -128,13 +112,9 @@ class _TaxiFarePageState extends State<TaxiFarePage> {
         }
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('요금이 승인되었습니다.')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('요금이 승인되었습니다.')));
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('요금 승인 실패: $e')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('요금 승인 실패: $e')));
     }
   }
 
@@ -143,10 +123,7 @@ class _TaxiFarePageState extends State<TaxiFarePage> {
     final stopoverId = msg['stopover_id'] as int?;
     if (stopoverId == null) return;
 
-    // stopoverId로 해당 그룹 번호 찾기
-    final groupNumber = widget.stopoverList.indexWhere(
-      (s) => s.stopover.id == stopoverId,
-    ) + 1;
+    final groupNumber = widget.stopoverList.indexWhere((s) => s.stopover.id == stopoverId) + 1;
     if (groupNumber == 0) return;
 
     if (eventType == 'FARE_INPUT') {
@@ -174,7 +151,6 @@ class _TaxiFarePageState extends State<TaxiFarePage> {
 
     SocketService.connect(token, onConnect: () {
       if (!_socketSubscribed) {
-        // 요금 입력/승인 이벤트 구독
         SocketService.subscribePartyMembers(
           partyId: int.parse(widget.partyId),
           onMessage: _handleSocketMessage,
@@ -209,16 +185,7 @@ class _TaxiFarePageState extends State<TaxiFarePage> {
       ),
       body: Column(
         children: [
-          const SizedBox(height: 10),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            child: Row(
-              children: [
-                const Text("현재 사용자: ", style: TextStyle(fontSize: 15)),
-                Text(myName, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ),
+          const SizedBox(height: 20),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 20),
             child: Column(
@@ -233,7 +200,7 @@ class _TaxiFarePageState extends State<TaxiFarePage> {
               ],
             ),
           ),
-          const SizedBox(height: 70),
+          const SizedBox(height: 60),
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16),
             padding: const EdgeInsets.all(16),
@@ -251,7 +218,6 @@ class _TaxiFarePageState extends State<TaxiFarePage> {
               }).toList(),
             ),
           ),
-          const SizedBox(height: 5),
         ],
       ),
     );
@@ -260,42 +226,30 @@ class _TaxiFarePageState extends State<TaxiFarePage> {
   Widget buildPassengerRow(int group, List<String> names, List<String> approvers, Color color) {
     final isMine = isMyGroup(group);
     final hasInput = fareInputs[group] != null;
-    String markerImage = 'assets/icons/marker_$group.png';
-
-    // 현재 그룹 이전까지의 모든 탑승자를 가져옴
-    final remainingPassengers = passengers.entries
-        .where((e) => e.key > group)  // 현재 그룹 이후의 탑승자만
+    final needsApproval = passengers.entries
+        .where((e) => e.key > group)
         .expand((e) => e.value)
-        .toSet()
-        .toList();
-
-    // 승인이 필요한지 확인 (내가 남은 탑승자 중 한 명인지)
-    final needsApproval = remainingPassengers.contains(myName);
+        .contains(myName);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Image.asset(markerImage, width: 28, height: 32),
+          Image.asset('assets/icons/marker_$group.png', width: 28, height: 32),
           const SizedBox(width: 1),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white,
-            ),
-            child: Text(names.join(', '), style: const TextStyle(fontWeight: FontWeight.bold)),
+            color: Colors.white,
+            child: Text(names.map(maskName).join(', '), style: const TextStyle(fontWeight: FontWeight.bold)),
           ),
-          const SizedBox(width: 0.1),
-
-          if (isMine && !hasInput) ...[
+          const SizedBox(width: 4),
+          if (isMine && !hasInput)
             Container(
               padding: const EdgeInsets.only(left: 15, top: 3, right: 3, bottom: 3),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
-                boxShadow: const [
-                  BoxShadow(color: Colors.black12, blurRadius: 4),
-                ],
+                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -330,19 +284,16 @@ class _TaxiFarePageState extends State<TaxiFarePage> {
                   ),
                 ],
               ),
-            ),
-          ] else if (hasInput) ...[
+            )
+          else if (hasInput) ...[
             Text('${fareInputs[group]} 원', style: const TextStyle(fontSize: 13)),
-            if (needsApproval && !approvers.contains(myName)) ...[
-              const SizedBox(width: 8),
+            if (needsApproval && !approvers.contains(myName))
               IconButton(
                 icon: const Icon(Icons.check_circle_outline, size: 20),
                 onPressed: () => approveFare(group),
                 color: Colors.green,
               ),
-            ],
           ],
-
           const Spacer(),
           Wrap(
             spacing: 6,
@@ -353,7 +304,7 @@ class _TaxiFarePageState extends State<TaxiFarePage> {
                   border: Border.all(color: color, width: 1.5),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Text(name, style: TextStyle(color: color, fontSize: 12)),
+                child: Text(maskName(name), style: TextStyle(color: color, fontSize: 12)),
               );
             }).toList(),
           ),
