@@ -53,6 +53,13 @@ class MyPagePopup {
                           const SizedBox(height: 12),
 
                           /// 마이페이지 카드
+                          const Padding(
+                            padding: EdgeInsets.only(left: 4, bottom: 15),
+                            child: Text(
+                              '----------------------------------------- 내 정보',
+                              style: TextStyle(fontSize: 11, color: Colors.grey),
+                            ),
+                          ),
                           Stack(
                             children: [
                               const MyPageCard(),
@@ -66,15 +73,20 @@ class MyPagePopup {
                               ),
                             ],
                           ),
-
-                          const SizedBox(height: 64), // 하단 버튼 공간 확보
+                          const Padding(
+                            padding: EdgeInsets.only(left: 4, top: 13),
+                            child: Text(
+                              '-----------------------------------------------',
+                              style: TextStyle(fontSize: 11, color: Colors.grey),
+                            ),
+                          ),
                         ],
                       ),
                     ),
 
                     /// 로그아웃 버튼
                     Positioned(
-                      bottom: 8,
+                      bottom: 1,
                       right: 8,
                       child: IconButton(
                         icon: const Icon(Icons.logout, color: Colors.grey),
