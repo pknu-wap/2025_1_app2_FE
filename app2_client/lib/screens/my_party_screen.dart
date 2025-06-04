@@ -46,8 +46,6 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
   // 로컬에 보관할 StopoverResponse 리스트
   List<StopoverResponse> _stopoverList = [];
 
-  bool _socketSubscribed = false;
-
   @override
   void initState() {
     super.initState();
@@ -67,50 +65,45 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
     if (token == null) return;
 
     SocketService.connect(token, onConnect: () {
-      if (!_socketSubscribed) {
-        // 1) 호스트에게 날아오는 참여 요청 메시지 구독 (명세상 /user/queue/join-request-response)
-        SocketService.subscribeJoinRequestResponse(onMessage: (msg) {
-          print('🔔 호스트용 참여 요청 메시지 수신: $msg');
-          if (msg['status'] == 'PENDING') {
-            try {
-              final joinRequest = JoinRequest.fromJson(msg);
-              print('✅ JoinRequest 파싱 성공: ${joinRequest.requesterEmail}');
-              setState(() {
-                _joinRequests.add(joinRequest);
-                print('✅ _joinRequests 길이: ${_joinRequests.length}');
-              });
-            } catch (e) {
-              print('❌ JoinRequest 파싱 실패: $e');
-              print('❌ 메시지 내용: $msg');
-            }
-          } else {
-            print('⚠️ status가 PENDING이 아님: ${msg['status']}');
+      // 소켓이 연결될 때마다 구독을 항상 등록
+      SocketService.subscribeJoinRequestResponse(onMessage: (msg) {
+        print('🔔 호스트용 참여 요청 메시지 수신: $msg');
+        if (msg['status'] == 'PENDING') {
+          try {
+            final joinRequest = JoinRequest.fromJson(msg);
+            print('✅ JoinRequest 파싱 성공: ${joinRequest.requesterEmail}');
+            setState(() {
+              _joinRequests.add(joinRequest);
+              print('✅ _joinRequests 길이: ${_joinRequests.length}');
+            });
+          } catch (e) {
+            print('❌ JoinRequest 파싱 실패: $e');
+            print('❌ 메시지 내용: $msg');
           }
-        });
+        } else {
+          print('⚠️ status가 PENDING이 아님: ${msg['status']}');
+        }
+      });
 
-        // 2) 파티 내부 업데이트(멤버 JOIN, 파티 업데이트 등)
-        SocketService.subscribePartyMembers(
-          partyId: _party.partyId,
-          onMessage: (msg) async {
-            print('🔔 파티 멤버 업데이트 메시지 수신: $msg');
-            final eventType = msg['eventType'];
-            if (eventType == 'MEMBER_JOIN' || eventType == 'PARTY_UPDATE') {
-              final updated = await PartyService.fetchPartyDetailById(
-                _party.partyId.toString(),
-              );
-              setState(() {
-                _party = updated;
-                // 만약 서버가 StopoverResponse를 내려준다면 여기서 _stopoverList도 업데이트
-                // 예: _stopoverList = updated.stopovers;
-              });
-              _refreshAllMarkers();
-            }
-          },
-        );
-
-        _socketSubscribed = true;
-        print('✅ 소켓 구독 완료 - 파티 ID: ${_party.partyId}');
-      }
+      SocketService.subscribePartyMembers(
+        partyId: _party.partyId,
+        onMessage: (msg) async {
+          print('🔔 파티 멤버 업데이트 메시지 수신: $msg');
+          final eventType = msg['eventType'];
+          if (eventType == 'MEMBER_JOIN' || eventType == 'PARTY_UPDATE') {
+            final updated = await PartyService.fetchPartyDetailById(
+              _party.partyId.toString(),
+            );
+            setState(() {
+              _party = updated;
+              // 만약 서버가 StopoverResponse를 내려준다면 여기서 _stopoverList도 업데이트
+              // 예: _stopoverList = updated.stopovers;
+            });
+            _refreshAllMarkers();
+          }
+        },
+      );
+      print('✅ 소켓 구독 완료 - 파티 ID: ${_party.partyId}');
     });
   }
 
@@ -718,9 +711,6 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                             style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
                         Text('참여 요청 개수: ${_joinRequests.length}'),
                         Text('파티 ID: ${_party.partyId}'),
-                        Text('소켓 구독 상태: $_socketSubscribed'),
-                        if (_joinRequests.isNotEmpty) 
-                          Text('요청자들: ${_joinRequests.map((r) => r.requesterEmail).join(", ")}'),
                       ],
                     ),
                   ),
