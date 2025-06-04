@@ -5,6 +5,7 @@ import 'package:stomp_dart_client/stomp.dart';
 import 'package:stomp_dart_client/stomp_config.dart';
 import 'package:stomp_dart_client/stomp_frame.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'dart:async';
 
 /// SocketService: STOMP over WebSocket 연결용 헬퍼 클래스
 /// - 백엔드(Spring)가 registerStompEndpoints("/ws").withSockJS() 로 열어 두었다면,
@@ -33,11 +34,13 @@ class SocketService {
   }
 
   /// STOMP over WebSocket 연결 수행
-  static void connect(String token, {void Function()? onConnect}) {
+  static Future<void> connect(String token, {void Function()? onConnect}) async {
     if (_connected) return;
 
     final url = _webSocketUrl(token);
     print('🔌 STOMP(WebSocket) 접속 시도 → $url');
+
+    final completer = Completer<void>();
 
     _client = StompClient(
       config: StompConfig(
@@ -47,9 +50,11 @@ class SocketService {
           _connected = true;
           print('✅ STOMP/WebSocket 연결 성공 (URL: $url)');
           if (onConnect != null) onConnect();
+          completer.complete();
         },
         onWebSocketError: (dynamic error) {
           print('❌ WebSocket 오류: $error');
+          completer.completeError(error);
         },
         onDisconnect: (StompFrame frame) {
           _connected = false;
@@ -57,6 +62,7 @@ class SocketService {
         },
         onStompError: (StompFrame frame) {
           print('⚠️ STOMP 오류: ${frame.body}');
+          completer.completeError(Exception(frame.body ?? 'Unknown STOMP error'));
         },
         // 적절히 heartbeat 설정 (10초마다)
         heartbeatOutgoing: const Duration(seconds: 10),
@@ -64,6 +70,8 @@ class SocketService {
       ),
     );
     _client!.activate();
+    
+    return completer.future;
   }
 
   /// 파티 외부 사용자용 브로드캐스트(파티 리스트 업데이트) 구독
