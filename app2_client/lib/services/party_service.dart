@@ -8,6 +8,8 @@ import 'package:app2_client/models/party_detail_model.dart';
 import 'package:app2_client/models/stopover_model.dart';
 import 'package:app2_client/models/location_model.dart';
 import 'package:app2_client/services/dio_client.dart';
+import 'package:app2_client/services/socket_service.dart';
+import 'dart:convert';
 
 import '../models/party_member_model.dart';
 
@@ -97,19 +99,22 @@ class PartyService {
     required String partyId,
     required String accessToken,
   }) async {
-    final url = "${ApiConstants.partyEndpoint}/$partyId/attend";
+    // WebSocket으로 참여 요청 전송
+    if (SocketService._client == null || !SocketService._connected) {
+      throw Exception('WebSocket이 연결되지 않았습니다.');
+    }
+
     try {
-      final response = await DioClient.dio.post(
-        url,
-        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+      SocketService._client!.send(
+        destination: '/app/party/attend',  // 서버 로그에 맞게 수정
+        body: json.encode({
+          'partyId': int.parse(partyId),  // 숫자로 변환
+          'accessToken': accessToken,
+        }),
       );
-      if (response.statusCode != 200) {
-        throw Exception('파티 참여 실패: ${response.data}');
-      }
-    } on DioException catch (e) {
-      // DioException을 그대로 다시 던져서 호출하는 곳에서 상태 코드별로 처리할 수 있도록 함
-      throw e;
+      print('📤 WebSocket으로 참여 요청 전송: /app/party/attend');
     } catch (e) {
+      print('❌ WebSocket 참여 요청 실패: $e');
       throw Exception('파티 참여 실패: $e');
     }
   }

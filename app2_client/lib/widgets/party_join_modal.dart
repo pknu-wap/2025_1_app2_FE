@@ -75,27 +75,40 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
 
   /// STOMP 메시지 수신 처리
   Future<void> _handleSocketMessage(Map<String, dynamic> message) async {
+    print('🔍 전체 메시지: $message');
+    
     final status = message['status'] as String?;
+    print('📌 status: $status');
+    
+    // requestId 필드 찾기 (여러 가능한 키 확인)
     final reqIdField = message.containsKey('requestId')
         ? 'requestId'
         : message.containsKey('request_id')
             ? 'request_id'
-            : null;
-
+            : message.containsKey('id')
+                ? 'id'
+                : null;
+    
+    print('🔑 reqIdField: $reqIdField');
+    
     final reqIdValue = reqIdField == null ? null : message[reqIdField];
+    print('💾 reqIdValue: $reqIdValue');
+    
     final int? parsedReqId = reqIdValue is int
         ? reqIdValue
         : (reqIdValue != null ? int.tryParse(reqIdValue.toString()) : null);
-
-    print('🔎 PENDING 메시지 파싱: status=$status, reqIdField=$reqIdField, parsedReqId=$parsedReqId');
+    
+    print('🎯 parsedReqId: $parsedReqId');
 
     if (status == 'PENDING' && parsedReqId != null) {
+      print('✅ PENDING 상태 감지, requestId: $parsedReqId');
       setState(() {
         _pendingRequestId = parsedReqId;
         _joinStatus = 'PENDING';
       });
       partyJoinPending[widget.pot.id] = true;
     } else if (status == 'APPROVED' || status == 'ACCEPTED') {
+      print('✅ 승인 상태 감지: $status');
       if (!mounted) return;
       SocketService.disconnect();
       _autoDisconnectTimer?.cancel();
@@ -114,6 +127,7 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
         }
       });
     } else if (status == 'REJECTED' || status == 'CANCELED') {
+      print('❌ 거절/취소 상태 감지: $status');
       if (!mounted) return;
       SocketService.disconnect();
       _autoDisconnectTimer?.cancel();
@@ -122,6 +136,8 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(status == 'REJECTED' ? '참여가 거절되었습니다' : '참여 요청이 취소되었습니다')),
       );
+    } else {
+      print('⚠️ 알 수 없는 상태: $status');
     }
   }
 
@@ -155,12 +171,12 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
         _subscribed = true;
       }
 
-      // 2. 구독이 완료된 후에 신청 요청 전송
+      // 2. WebSocket으로 참여 요청 전송
       await PartyService.attendParty(
         partyId: widget.pot.id,
         accessToken: _accessToken!,
       );
-      print('✅ 신청 요청 전송 완료');
+      print('✅ 참여 요청 전송 완료');
       partyJoinPending[widget.pot.id] = true;
 
       // 3. 5분 타이머 시작
