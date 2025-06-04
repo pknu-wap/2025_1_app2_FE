@@ -14,12 +14,9 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env');
 
-  if (Platform.isAndroid) {
-    // Firebase 초기화 (Android에서만 실행)
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  }
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   final authProvider = AuthProvider();
   await authProvider.initTokens();
@@ -28,7 +25,9 @@ Future<void> main() async {
     OverlaySupport.global(
       child: ChangeNotifierProvider.value(
         value: authProvider,
-        child: const MyApp(),
+        child: Platform.isAndroid
+          ? SafeArea(child: const MyApp())
+          : const MyApp(),
       ),
     ),
   );

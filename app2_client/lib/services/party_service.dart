@@ -98,12 +98,19 @@ class PartyService {
     required String accessToken,
   }) async {
     final url = "${ApiConstants.partyEndpoint}/$partyId/attend";
-    final response = await DioClient.dio.post(
-      url,
-      options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
-    );
-    if (response.statusCode != 200) {
-      throw Exception('파티 참여 실패: ${response.data}');
+    try {
+      final response = await DioClient.dio.post(
+        url,
+        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+      );
+      if (response.statusCode != 200) {
+        throw Exception('파티 참여 실패: ${response.data}');
+      }
+    } on DioException catch (e) {
+      // DioException을 그대로 다시 던져서 호출하는 곳에서 상태 코드별로 처리할 수 있도록 함
+      throw e;
+    } catch (e) {
+      throw Exception('파티 참여 실패: $e');
     }
   }
 
@@ -267,5 +274,73 @@ class PartyService {
     return arr
         .map((e) => PartyMember.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  /// 요금 입력 (POST /api/party/{partyId}/fare)
+  static Future<void> submitFare({
+    required String partyId,
+    required int stopoverId,
+    required int fare,
+    required String accessToken,
+  }) async {
+    final url = "${ApiConstants.partyEndpoint}/$partyId/fare";
+    final body = {
+      "stopover_id": stopoverId,
+      "fare": fare,
+    };
+    
+    final response = await DioClient.dio.post(
+      url,
+      data: body,
+      options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+    );
+    
+    if (response.statusCode != 200) {
+      throw Exception('요금 입력 실패: ${response.statusCode}');
+    }
+  }
+
+  /// 요금 승인 (POST /api/party/{partyId}/fare/approve)
+  static Future<void> approveFare({
+    required String partyId,
+    required int stopoverId,
+    required String accessToken,
+  }) async {
+    final url = "${ApiConstants.partyEndpoint}/$partyId/fare/approve";
+    final body = {
+      "stopover_id": stopoverId,
+    };
+    
+    final response = await DioClient.dio.post(
+      url,
+      data: body,
+      options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+    );
+    
+    if (response.statusCode != 200) {
+      throw Exception('요금 승인 실패: ${response.statusCode}');
+    }
+  }
+
+  /// 요금 거절 (POST /api/party/{partyId}/fare/reject)
+  static Future<void> rejectFare({
+    required String partyId,
+    required int stopoverId,
+    required String accessToken,
+  }) async {
+    final url = "${ApiConstants.partyEndpoint}/$partyId/fare/reject";
+    final body = {
+      "stopover_id": stopoverId,
+    };
+    
+    final response = await DioClient.dio.post(
+      url,
+      data: body,
+      options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+    );
+    
+    if (response.statusCode != 200) {
+      throw Exception('요금 거절 실패: ${response.statusCode}');
+    }
   }
 }

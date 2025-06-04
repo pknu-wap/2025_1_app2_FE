@@ -27,9 +27,9 @@ class AuthProvider extends ChangeNotifier {
 
   /// 로그인 + 서버 인증
   /// @deprecated 예정
-  Future<String> login() async {
+  Future<String?> login() async {
     final u = await _authService.loginWithGoogle();
-    if (u == null) return 'GOOGLE_SIGN_IN_FAILED';
+    if (u == null) return null;  // 구글 로그인 취소 시 null 반환
 
     _user = u;
 

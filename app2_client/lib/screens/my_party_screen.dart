@@ -68,13 +68,23 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
 
     SocketService.connect(token, onConnect: () {
       if (!_socketSubscribed) {
-        // 1) 호스트에게 날아오는 "참여 요청 응답" (PENDING, APPROVED, REJECTED, CANCELED)
+        // 1) 호스트에게 날아오는 참여 요청 메시지 구독 (명세상 /user/queue/join-request-response)
         SocketService.subscribeJoinRequestResponse(onMessage: (msg) {
-          // msg 안에 type이 "JOIN_REQUEST"인 경우엔 새 요청 정보를 _joinRequests에 추가
-          if (msg['type'] == 'JOIN_REQUEST') {
-            setState(() {
-              _joinRequests.add(JoinRequest.fromJson(msg));
-            });
+          print('🔔 호스트용 참여 요청 메시지 수신: $msg');
+          if (msg['status'] == 'PENDING') {
+            try {
+              final joinRequest = JoinRequest.fromJson(msg);
+              print('✅ JoinRequest 파싱 성공: ${joinRequest.requesterEmail}');
+              setState(() {
+                _joinRequests.add(joinRequest);
+                print('✅ _joinRequests 길이: ${_joinRequests.length}');
+              });
+            } catch (e) {
+              print('❌ JoinRequest 파싱 실패: $e');
+              print('❌ 메시지 내용: $msg');
+            }
+          } else {
+            print('⚠️ status가 PENDING이 아님: ${msg['status']}');
           }
         });
 
@@ -82,6 +92,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
         SocketService.subscribePartyMembers(
           partyId: _party.partyId,
           onMessage: (msg) async {
+            print('🔔 파티 멤버 업데이트 메시지 수신: $msg');
             final eventType = msg['eventType'];
             if (eventType == 'MEMBER_JOIN' || eventType == 'PARTY_UPDATE') {
               final updated = await PartyService.fetchPartyDetailById(
@@ -98,6 +109,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
         );
 
         _socketSubscribed = true;
+        print('✅ 소켓 구독 완료 - 파티 ID: ${_party.partyId}');
       }
     });
   }
@@ -666,8 +678,8 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                       return Card(
                         color: Colors.amber[50],
                         child: ListTile(
-                          title: Text(req.userName),
-                          subtitle: Text(req.userEmail),
+                          title: Text(req.requesterEmail),
+                          subtitle: Text('요청 ID: ${req.requestId}'),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -690,6 +702,28 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                     }).toList(),
                     const SizedBox(height: 16),
                   ],
+
+                  // 디버그: 현재 _joinRequests 상태 표시
+                  const Divider(),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('🔧 디버그 정보', 
+                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                        Text('참여 요청 개수: ${_joinRequests.length}'),
+                        Text('파티 ID: ${_party.partyId}'),
+                        Text('소켓 구독 상태: $_socketSubscribed'),
+                        if (_joinRequests.isNotEmpty) 
+                          Text('요청자들: ${_joinRequests.map((r) => r.requesterEmail).join(", ")}'),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
