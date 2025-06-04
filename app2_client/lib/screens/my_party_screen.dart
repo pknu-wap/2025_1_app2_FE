@@ -68,15 +68,13 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
 
     SocketService.connect(token, onConnect: () {
       if (!_socketSubscribed) {
-        // 1) 호스트에게 날아오는 새로운 참여 요청 알림
-        SocketService.subscribeJoinRequests(onMessage: (msg) {
+        // 1) 호스트에게 날아오는 참여 요청 메시지 구독 (명세상 /user/queue/join-request-response)
+        SocketService.subscribeJoinRequestResponse(onMessage: (msg) {
           print('🔔 호스트용 참여 요청 메시지 수신: $msg');
-          // 새로운 참여 요청이 오면 _joinRequests에 추가
-          if (msg['type'] == 'JOIN_REQUEST') {
-            print('✅ JOIN_REQUEST 타입 확인됨, JoinRequest 추가 시도');
+          if (msg['status'] == 'PENDING') {
             try {
               final joinRequest = JoinRequest.fromJson(msg);
-              print('✅ JoinRequest 파싱 성공: ${joinRequest.requesterEmail} (${joinRequest.requesterEmail})');
+              print('✅ JoinRequest 파싱 성공: ${joinRequest.requesterEmail}');
               setState(() {
                 _joinRequests.add(joinRequest);
                 print('✅ _joinRequests 길이: ${_joinRequests.length}');
@@ -86,7 +84,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
               print('❌ 메시지 내용: $msg');
             }
           } else {
-            print('⚠️ 예상하지 못한 메시지 타입: ${msg['type']}');
+            print('⚠️ status가 PENDING이 아님: ${msg['status']}');
           }
         });
 
