@@ -107,7 +107,7 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
                 color: m.gender == 'FEMALE' ? Colors.pink : Colors.blue,
               ),
               title: Text(m.name),
-              subtitle: Text('${m.email} (${m.role})'),
+              subtitle: Text('${m.email} (${m.role ?? '일반 멤버'})'),
             )),
           ],
         ),
