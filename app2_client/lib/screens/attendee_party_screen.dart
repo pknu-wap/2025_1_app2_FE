@@ -108,7 +108,7 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
     SocketService.connect(token, onConnect: () {
       _doSubscribe();
     });
-    if (SocketService.connected) {
+    if (SocketService.isConnected) {
       _doSubscribe();
     }
   }
