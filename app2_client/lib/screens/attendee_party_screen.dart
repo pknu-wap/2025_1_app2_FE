@@ -39,24 +39,17 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
         Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
     if (token == null) return;
 
-    // 구독 로직을 함수로 분리
     void _doSubscribe() {
       if (!_subscribed) {
-        // 1) 파티 멤버 업데이트(브로드캐스트) 구독
         SocketService.subscribePartyMembers(
           partyId: int.parse(widget.partyId),
           onMessage: (_) => _fetchParty(),
         );
-
-        // 2) 개인적인 참여 요청 응답 구독 (여기서는 이미 승인이 됐으므로 실제로는 ACCEPTED를 받을 일은 거의 없지만,
-        //    혹시 나중에 “REJECTED” 메시지가 들어오면 토스트로 띄우거나 해줄 수도 있다.)
         SocketService.subscribeJoinRequestResponse(onMessage: (msg) {
           final int partyId = msg['partyId'] as int;
           final String status = msg['status'] as String;
           if (partyId == int.parse(widget.partyId)) {
             if (status == 'ACCEPTED') {
-              // (이미 화면이 AttendeePartyScreen이라서 굳이 이동은 안 해도 되지만,
-              //  혹시 뒤로 가 있었다면 다시 불러올 수도 있다.)
               _fetchParty();
             } else if (status == 'REJECTED') {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -65,17 +58,14 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
             }
           }
         });
-
         _subscribed = true;
       }
     }
 
-    // 1) STOMP 연결 시도 → 처음 연결되면 onConnect에서 _doSubscribe() 호출
     SocketService.connect(token, onConnect: () {
       _doSubscribe();
     });
 
-    // 2) 이미 연결된 상태라면(onConnect이 안 불릴 수 있음) 바로 구독
     if (SocketService.connected) {
       _doSubscribe();
     }
@@ -103,8 +93,6 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
 
   @override
   void dispose() {
-    // 현재는 화면을 떠날 때 STOMP 연결을 끊도록 구현.
-    // (필요하다면, 구독만 해제하는 방식으로 수정 가능)
     SocketService.disconnect();
     super.dispose();
   }
@@ -121,27 +109,73 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
       appBar: AppBar(
         title: Text(widget.isHost ? '내 파티 관리' : '파티 상세정보'),
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('출발지: ${party!.originAddress}'),
-            Text('도착지: ${party!.destAddress}'),
-            Text('반경: ${party!.radius}km'),
-            Text('최대 인원: ${party!.maxPerson}명'),
-            Text('옵션: ${party!.partyOption}'),
-            const SizedBox(height: 16),
-            const Text('파티원 목록', style: TextStyle(fontWeight: FontWeight.bold)),
+            // ─── 기본 정보 ─────────────────────────────────────────────
+            Text(
+              '출발지',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 4),
+            Text(party!.originAddress, style: TextStyle(fontSize: 14)),
+            const SizedBox(height: 12),
+
+            Text(
+              '도착지',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 4),
+            Text(party!.destAddress, style: TextStyle(fontSize: 14)),
+            const SizedBox(height: 12),
+
+            Text(
+              '반경: ${party!.radius} km',
+              style: TextStyle(fontSize: 14),
+            ),
             const SizedBox(height: 8),
-            ...party!.members.map((m) => ListTile(
-              leading: Icon(
-                m.gender == 'FEMALE' ? Icons.female : Icons.male,
-                color: m.gender == 'FEMALE' ? Colors.pink : Colors.blue,
-              ),
-              title: Text(m.name),
-              subtitle: Text('${m.email} (${m.role})'),
-            )),
+
+            Text(
+              '최대 인원: ${party!.maxPerson}명',
+              style: TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 8),
+
+            Text(
+              '옵션: ${party!.partyOption}',
+              style: TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 24),
+
+            const Divider(),
+            const SizedBox(height: 12),
+
+            // ─── 파티원 목록 ─────────────────────────────────────────────
+            const Text(
+              '파티원 목록',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+
+            // 각 멤버를 Card 안에 ListTile 형태로 감싼다.
+            ...party!.members.map((m) {
+              return Card(
+                margin: const EdgeInsets.symmetric(vertical: 6),
+                child: ListTile(
+                  leading: Icon(
+                    m.gender == 'FEMALE' ? Icons.female : Icons.male,
+                    color: m.gender == 'FEMALE' ? Colors.pink : Colors.blue,
+                  ),
+                  title: Text(m.name),
+                  subtitle: Text('${m.email} (${m.role})'),
+                  // 호스트 자격이면 정산자 지정 버튼 대신 없애거나 표시하지 않음
+                ),
+              );
+            }).toList(),
+
+            const SizedBox(height: 24),
           ],
         ),
       ),
