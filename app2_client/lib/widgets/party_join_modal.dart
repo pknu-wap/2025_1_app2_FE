@@ -62,7 +62,7 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
         // 1) 모달을 닫는다.
         if (mounted) Navigator.of(context).pop();
 
-        // 2) 사용자에게 “참여 완료됨” 스낵바 띄우기
+        // 2) 사용자에게 "참여 완료됨" 스낵바 띄우기
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('참여 요청이 수락되었어!')),
@@ -82,7 +82,7 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
         }
       }
 
-      // 만약 “REJECTED” 메시지를 받으면 알림만 띄우고 모달은 열어둔 상태로 유지할 수도 있다.
+      // 만약 "REJECTED" 메시지를 받으면 알림만 띄우고 모달은 열어둔 상태로 유지할 수도 있다.
       if (partyId.toString() == widget.pot.id && status == 'REJECTED') {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -113,6 +113,23 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
       return;
     }
 
+    // partyOption 필터링 로직 추가
+    final userGender = Provider.of<AuthProvider>(context, listen: false).userGender; // 사용자 성별 정보 가져오기
+    if (widget.pot.partyOption == 'ONLY_MALE' && userGender != 'MALE') {
+      setState(() {
+        _isRequesting = false;
+        _errorMessage = '남성만 참여 가능한 파티입니다.';
+      });
+      return;
+    }
+    if (widget.pot.partyOption == 'ONLY_FEMALE' && userGender != 'FEMALE') {
+      setState(() {
+        _isRequesting = false;
+        _errorMessage = '여성만 참여 가능한 파티입니다.';
+      });
+      return;
+    }
+
     try {
       // 1) 파티 참가 요청 API 호출
       await PartyService.attendParty(
@@ -120,7 +137,7 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
         accessToken: token,
       );
 
-      // 2) API 호출 성공 → “승인을 기다리는 중입니다” 스낵바 띄우기
+      // 2) API 호출 성공 → "승인을 기다리는 중입니다" 스낵바 띄우기
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('승인을 기다리는 중입니다...')),
@@ -128,7 +145,7 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
       }
 
       // 3) 모달은 닫지 않고 그대로 두어서,
-      //    이후 백엔드에서 보내줄 “ACCEPTED” 메시지를 대기한다.
+      //    이후 백엔드에서 보내줄 "ACCEPTED" 메시지를 대기한다.
     } catch (e) {
       // 4) API 호출 실패 시 에러 메시지 표시
       setState(() {
@@ -169,7 +186,7 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
 
             // ─── 타이틀 ─────────────────────────────────────────────────────
             Text(
-              '“${widget.pot.creatorName}” 님의 팟에 참여하기',
+              '"${widget.pot.creatorName}" 님의 팟에 참여하기',
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),

@@ -50,9 +50,9 @@ class PartyDetail {
         .toList() ??
         [];
 
-    final stopoverList = (json['party_stopovers'] as List<dynamic>?)
-        ?.where((e) => e != null)
-        .map((e) => StopoverResponse.fromJson(e as Map<String, dynamic>))
+    final stopoverList = (json['party_stopovers'] as List?)
+        ?.whereType<Map<String, dynamic>>()
+        .map((e) => StopoverResponse.fromJson(e))
         .toList() ?? [];
 
     return PartyDetail(
