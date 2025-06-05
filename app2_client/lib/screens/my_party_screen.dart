@@ -71,21 +71,26 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
     void _doSubscribe() {
       if (_subscribed) return;
 
-      // ─── 참여 요청 수신 구독 (호스트 전용) ────────────────────────────────
-      SocketService.subscribeJoinRequests(onMessage: (msg) {
-        // 예시 msg:
+      // ─── 참여 요청 응답 구독 (호스트 전용) ────────────────────────────────
+      // 백엔드가 '/user/queue/join-request-response' 채널로 PENDING/ACCEPTED/REJECTED 알림을 보냅니다.
+      SocketService.subscribeJoinRequestResponse(onMessage: (msg) {
+        // msg 예시:
         // {
-        //   "type": "JOIN_REQUEST",
-        //   "request_id": 123,
-        //   "name": "홍길동",
-        //   "email": "hong@domain.com",
-        //   "partyId": 84
+        //   "partyId": 84,
+        //   "requestId": 123,
+        //   "requesterEmail": "user@example.com",
+        //   "hostEmail": "me@domain.com",
+        //   "status": "PENDING",
+        //   "message": "...",
+        //   "respondedAt": "2025-06-05T12:51:02.061"
         // }
 
-        // ① 들어온 메시지의 partyId와 현재 화면의 _party.partyId를 비교
         final incomingPartyId = msg['partyId']?.toString();
-        if (incomingPartyId == _party.partyId.toString()) {
-          // ② 파티 ID가 일치할 때만 리스트에 추가
+        final status = msg['status'] as String? ?? '';
+        final requestId = msg['requestId'] as int?; // null 체크는 하지 않았습니다
+
+        // “내 파티 ID”와 같고, ‘신규 요청(PENDING)’ 일 때만 대기열에 추가
+        if (incomingPartyId == _party.partyId.toString() && status == 'PENDING') {
           try {
             final joinRequest = JoinRequest.fromJson(msg);
             setState(() {
@@ -94,10 +99,6 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
           } catch (e) {
             debugPrint('❌ JoinRequest 파싱 실패: $e');
           }
-        } else {
-          // 파티 ID가 다르면 무시
-          debugPrint(
-              '🔕 다른 파티($incomingPartyId) 요청이라 무시: 현재 파티=${_party.partyId}');
         }
       });
 
@@ -112,7 +113,6 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
             );
             setState(() {
               _party = updated;
-              // 필요하다면 _stopoverList도 갱신
             });
             _refreshAllMarkers();
           }
@@ -169,12 +169,12 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
     if (!_mapLoaded || _mapController == null) return;
 
     try {
-      // 1) 기존 마커 모두 제거
+      // 1) 기존 마커 제거
       for (final stop in _stopoverList) {
         await _mapController!
             .runJavaScript('removeMarker("${stop.stopover.id}");');
       }
-      // Host 도착지(빨간색) 마커만 ID "destination"으로 제거
+      // Host 도착지(빨간색) 마커 제거
       await _mapController!.runJavaScript('removeMarker("destination");');
 
       // 2) Host 도착지(빨간색) 마커 찍기
@@ -184,7 +184,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
         'addMarker("destination", $destLat, $destLng, "도착지", "red");',
       );
 
-      // 3) 각 경유지(초록색) 마커 찍기
+      // 3) 경유지(초록색) 마커 찍기
       for (final stop in _stopoverList) {
         final id = stop.stopover.id.toString();
         final lat = stop.stopover.location.lat;
@@ -213,7 +213,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
       setState(() {
         _joinRequests.removeWhere((r) => r.requestId == requestId);
       });
-      // MEMBER_JOIN 브로드캐스트를 받아 자동으로 _party 갱신됨
+      // subscribePartyMembers 쪽으로 MEMBER_JOIN 브로드캐스트가 와서 _party 갱신됨
     } catch (e) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('수락 실패: $e')));
@@ -326,7 +326,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
 
                   const SizedBox(height: 24),
 
-                  // ─── 오직 “내 파티의 ID”로 온 요청만 보여줌 ───────────────────────────
+                  // ─── 오직 “내 파티 ID”로 온 요청만 보여줌 ───────────────────────────
                   if (_joinRequests.isNotEmpty) ...[
                     const Divider(),
                     const SizedBox(height: 8),
