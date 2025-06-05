@@ -115,7 +115,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
     });
 
     // 2) 이미 연결된 상태라면(onConnect이 불릴 수 없으므로) 즉시 구독
-    if (SocketService.connected) {
+    if (SocketService.isConnected) {
       _doSubscribe();
     }
   }
@@ -662,7 +662,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
 
                   const SizedBox(height: 24),
 
-                  // ─── 오직 “내 파티 ID”로 온 요청만 보여줌 ───────────────────────────
+                  // ─── 오직 "내 파티 ID"로 온 요청만 보여줌 ───────────────────────────
                   if (_joinRequests.isNotEmpty) ...[
                     const Divider(),
                     const SizedBox(height: 8),
