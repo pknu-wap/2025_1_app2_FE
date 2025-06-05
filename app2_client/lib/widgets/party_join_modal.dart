@@ -1,21 +1,14 @@
-// lib/screens/party_join_modal.dart
+// lib/widgets/party_join_modal.dart
 
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:app2_client/models/party_model.dart';
-import 'package:app2_client/screens/attendee_party_screen.dart';
 import 'package:provider/provider.dart';
+import 'package:app2_client/models/party_model.dart';
+import 'package:app2_client/services/party_service.dart';
+import 'package:app2_client/services/socket_service.dart';
 import 'package:app2_client/providers/auth_provider.dart';
-import '../services/party_service.dart';
-import '../services/socket_service.dart';
-import 'package:dio/dio.dart';
-import 'package:app2_client/main.dart'; // navigatorKey import
-import 'package:overlay_support/overlay_support.dart';
-import 'dart:async';
+import 'package:app2_client/screens/attendee_party_screen.dart';
 
-/// 파티 참여 모달 (팟 신청하기)
-/// - STOMP 연결 후 "/user/queue/join-request-response" 개인 응답 채널을 구독
-/// - 서버가 "PENDING" → "ACCEPTED"(또는 APPROVED) → "REJECTED" → "CANCELED" 등의 상태를 내려줌
 class PartyJoinModal extends StatefulWidget {
   final PartyModel pot;
 
@@ -25,284 +18,214 @@ class PartyJoinModal extends StatefulWidget {
   State<PartyJoinModal> createState() => _PartyJoinModalState();
 }
 
-// 파티별 참여 요청 상태를 기억하는 전역 Map
-final Map<String, bool> partyJoinPending = {};
-
 class _PartyJoinModalState extends State<PartyJoinModal> {
-  String? _accessToken;
-  bool _loading = false;
-  bool _subscribed = false;
-  Timer? _autoDisconnectTimer;
-
-  /// 서버가 내려주는 "요청 ID"를 로컬에 저장해 두면, 취소 시에 사용
-  int? _pendingRequestId;
-
-  /// 지금 모달이 어떤 상태인지
-  /// - 'IDLE'    : 아직 신청 전
-  /// - 'WAIT'    : HTTP 요청 전송 직후 (로딩 중)
-  /// - 'PENDING' : 서버에서 "PENDING" 상태를 내려줌 (방장 승인 대기)
-  /// - 'APPROVED': 서버에서 승인(또는 ACCEPTED) 상태를 내려줌 → 바로 파티 화면으로 이동
-  /// - 'REJECTED': 서버에서 거절 상태를 내려줌 → 스낵바 띄우고 모달 닫힘
-  /// - 'CANCELED': 서버에서 취소 상태를 내려줌 → 스낵바 띄우고 모달 닫힘
-  String _joinStatus = 'IDLE';
+  bool _isRequesting = false;        // API 호출 중인지 표시
+  bool _subscribed = false;          // 구독 등록 여부
+  String? _errorMessage;             // 호출 실패 시 에러 메시지
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-
-    // 1) AuthProvider에서 현재 로그인된 액세스 토큰을 가져오기
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    _accessToken = auth.tokens?.accessToken;
-
-    if (_accessToken == null) {
-      // 토큰이 없으면 모달을 종료하고 "로그인이 필요합니다" 메시지 출력
-      Future.microtask(() {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('로그인이 필요합니다.')),
-        );
-      });
-      return;
-    }
-
-    // 모달이 열릴 때 프론트 상태로 참여 요청 중인지 확인
-    if (partyJoinPending[widget.pot.id] == true) {
-      setState(() {
-        _joinStatus = 'PENDING';
-      });
-    }
-  }
-
-  /// STOMP 메시지 수신 처리
-  Future<void> _handleSocketMessage(Map<String, dynamic> message) async {
-    print('🔍 전체 메시지: $message');
-    
-    final status = message['status'] as String?;
-    print('📌 status: $status');
-    
-    // requestId 필드 찾기 (여러 가능한 키 확인)
-    final reqIdField = message.containsKey('requestId')
-        ? 'requestId'
-        : message.containsKey('request_id')
-            ? 'request_id'
-            : message.containsKey('id')
-                ? 'id'
-                : null;
-    
-    print('🔑 reqIdField: $reqIdField');
-    
-    final reqIdValue = reqIdField == null ? null : message[reqIdField];
-    print('💾 reqIdValue: $reqIdValue');
-    
-    final int? parsedReqId = reqIdValue is int
-        ? reqIdValue
-        : (reqIdValue != null ? int.tryParse(reqIdValue.toString()) : null);
-    
-    print('🎯 parsedReqId: $parsedReqId');
-
-    if (status == 'PENDING' && parsedReqId != null) {
-      print('✅ PENDING 상태 감지, requestId: $parsedReqId');
-      setState(() {
-        _pendingRequestId = parsedReqId;
-        _joinStatus = 'PENDING';
-      });
-      partyJoinPending[widget.pot.id] = true;
-    } else if (status == 'APPROVED' || status == 'ACCEPTED') {
-      print('✅ 승인 상태 감지: $status');
-      if (!mounted) return;
-      SocketService.disconnect();
-      _autoDisconnectTimer?.cancel();
-      Navigator.pop(context);
-      partyJoinPending[widget.pot.id] = false;
-      setState(() => _loading = true);
-      Future.delayed(Duration(milliseconds: 200), () {
-        if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => AttendeePartyScreen(partyId: widget.pot.id),
-            ),
-          );
-          setState(() => _loading = false);
-        }
-      });
-    } else if (status == 'REJECTED' || status == 'CANCELED') {
-      print('❌ 거절/취소 상태 감지: $status');
-      if (!mounted) return;
-      SocketService.disconnect();
-      _autoDisconnectTimer?.cancel();
-      Navigator.pop(context);
-      partyJoinPending[widget.pot.id] = false;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(status == 'REJECTED' ? '참여가 거절되었습니다' : '참여 요청이 취소되었습니다')),
-      );
-    } else {
-      print('⚠️ 알 수 없는 상태: $status');
-    }
-  }
-
-  /// "팟 신청하기" 버튼 클릭 시 HTTP 호출 → 서버에서 PENDING 메시지를 STOMP로 내려줌
-  Future<void> _joinParty() async {
-    setState(() {
-      _loading = true;
-      _joinStatus = 'WAIT';
-    });
-
-    try {
-      // 1. 소켓 연결 및 구독(이미 연결되어 있으면 생략)
-      if (!_subscribed) {
-        // 소켓 연결 및 구독이 완료될 때까지 대기
-        await SocketService.connect(_accessToken!, onConnect: () {
-          print('👂 구독: /user/queue/join-request-response (PartyJoinModal)');
-          SocketService.subscribeJoinRequestResponse(onMessage: (msg) {
-            print('🔔 메시지 수신: $msg');
-            try {
-              _handleSocketMessage(msg);
-            } catch (e, st) {
-              print('❌ 메시지 파싱/상태 갱신 예외: $e\n$st');
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('메시지 파싱 오류: $e')),
-                );
-              }
-            }
-          });
-        });
-        _subscribed = true;
-      }
-
-      // 2. WebSocket으로 참여 요청 전송
-      await PartyService.attendParty(
-        partyId: widget.pot.id,
-        accessToken: _accessToken!,
-      );
-      print('✅ 참여 요청 전송 완료');
-      partyJoinPending[widget.pot.id] = true;
-
-      // 3. 5분 타이머 시작
-      _autoDisconnectTimer?.cancel();
-      _autoDisconnectTimer = Timer(const Duration(minutes: 5), () {
-        print('⏰ 5분 경과, 소켓 자동 해제');
-        SocketService.disconnect();
-      });
-    } catch (e) {
-      print('❌ 오류 발생: $e');
-      if (mounted) {
-        setState(() => _joinStatus = 'IDLE');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('참여 요청 실패: $e')),
-        );
-      }
-      partyJoinPending[widget.pot.id] = false;
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  /// "참여 요청 취소" 버튼 클릭 시 HTTP 호출 → 서버에서 CANCELED 메시지를 STOMP로 내려줌
-  Future<void> _cancelJoinRequest() async {
-    if (_pendingRequestId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('요청 ID를 확인할 수 없습니다.')),
-      );
-      return;
-    }
-    try {
-      setState(() => _loading = true);
-      await PartyService.cancelJoinRequest(
-        partyId: widget.pot.id,
-        requestId: _pendingRequestId!,
-        accessToken: _accessToken!,
-      );
-      // 이후 CANCELED 메시지는 WebSocket으로 처리
-      // 프론트 상태도 초기화는 메시지 수신에서 처리
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('참여 요청 취소 실패: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
+  void initState() {
+    super.initState();
+    _subscribeJoinResponse();        // 모달이 뜰 때 곧바로 구독을 걸어준다.
   }
 
   @override
   void dispose() {
-    _autoDisconnectTimer?.cancel();
-    // SocketService.disconnect(); // 해제는 응답/타이머에서만!
+    // (필요하다면) 구독 해제 로직을 넣어도 된다.
+    // 여기서는 단순화하여 SocketService.disconnect()를 호출하지 않고
+    // 앱 전체 커넥션을 유지한다고 가정한다.
     super.dispose();
+  }
+
+  /// `/queue/join-request-response` 구독:
+  /// PENDING, ACCEPTED, REJECTED 등의 메시지를 받는다.
+  void _subscribeJoinResponse() {
+    // 이미 구독한 상태라면 다시 구독하지 않는다.
+    if (_subscribed) return;
+
+    SocketService.subscribeJoinRequestResponse(onMessage: (msg) {
+      // msg 예시:
+      // {
+      //   "partyId": 78,
+      //   "requestId": 67,
+      //   "requesterEmail": "pdanny79052@pukyong.ac.kr",
+      //   "hostEmail": "junyong1102@pukyong.ac.kr",
+      //   "status": "ACCEPTED",  // 혹은 PENDING, REJECTED, ...
+      //   "message": "파티 참가 요청이 수락되었습니다.",
+      //   "respondedAt": "2025-06-05T12:51:06.771340541"
+      // }
+      final int partyId = msg['partyId'] as int;
+      final String status = msg['status'] as String;
+
+      // 내가 요청한 파티 ID와 일치하며, status가 ACCEPTED일 때만 화면 전환
+      if (partyId.toString() == widget.pot.id && status == 'ACCEPTED') {
+        // 1) 모달을 닫는다.
+        if (mounted) Navigator.of(context).pop();
+
+        // 2) 사용자에게 “참여 완료됨” 스낵바 띄우기
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('참여 요청이 수락되었어!')),
+          );
+        }
+
+        // 3) AttendeePartyScreen 으로 네비게이트
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => AttendeePartyScreen(
+                partyId: widget.pot.id,
+                isHost: false,
+              ),
+            ),
+          );
+        }
+      }
+
+      // 만약 “REJECTED” 메시지를 받으면 알림만 띄우고 모달은 열어둔 상태로 유지할 수도 있다.
+      if (partyId.toString() == widget.pot.id && status == 'REJECTED') {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('참여 요청이 거절되었어.')),
+          );
+        }
+        // 필요하다면 모달 닫기:
+        // if (mounted) Navigator.of(context).pop();
+      }
+    });
+
+    _subscribed = true;
+  }
+
+  Future<void> _handleJoin() async {
+    if (_isRequesting) return;
+    setState(() {
+      _isRequesting = true;
+      _errorMessage = null;
+    });
+
+    final token = Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
+    if (token == null) {
+      setState(() {
+        _isRequesting = false;
+        _errorMessage = '로그인이 필요합니다.';
+      });
+      return;
+    }
+
+    try {
+      // 1) 파티 참가 요청 API 호출
+      await PartyService.attendParty(
+        partyId: widget.pot.id,
+        accessToken: token,
+      );
+
+      // 2) API 호출 성공 → “승인을 기다리는 중입니다” 스낵바 띄우기
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('승인을 기다리는 중입니다...')),
+        );
+      }
+
+      // 3) 모달은 닫지 않고 그대로 두어서,
+      //    이후 백엔드에서 보내줄 “ACCEPTED” 메시지를 대기한다.
+    } catch (e) {
+      // 4) API 호출 실패 시 에러 메시지 표시
+      setState(() {
+        _errorMessage = '참여 요청 실패: $e';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRequesting = false;
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        DraggableScrollableSheet(
-          expand: false,
-          builder: (context, ctl) {
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-              ),
-              child: ListView(
-                controller: ctl,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  Text(
-                    widget.pot.creatorName,
-                    style:
-                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    DateFormat('yyyy/MM/dd HH:mm')
-                        .format(widget.pot.createdAt),
-                    style: const TextStyle(color: Colors.black54),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  Text('남은 자리: ${widget.pot.remainingSeats}명'),
-                  const SizedBox(height: 12),
-                  Text('출발: ${widget.pot.originAddress}'),
-                  Text('도착: ${widget.pot.destAddress}'),
-                  const SizedBox(height: 24),
-                  // "팟 신청하기" / "참여 요청 취소" 버튼
-                  if (_joinStatus == 'IDLE' || _joinStatus == 'WAIT')
-                    ElevatedButton(
-                      onPressed:
-                      _accessToken == null || _loading ? null : _joinParty,
-                      child: const Text('팟 신청하기'),
-                    ),
-                  if (_joinStatus == 'PENDING')
-                    ElevatedButton(
-                      onPressed: _loading ? null : _cancelJoinRequest,
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red),
-                      child: const Text('참여 요청 취소'),
-                    ),
-                ],
-              ),
-            );
-          },
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+          left: 16,
+          right: 16,
+          top: 16,
         ),
-        if (_loading)
-          Container(
-            color: Colors.black.withOpacity(0.2),
-            child: const Center(child: CircularProgressIndicator()),
-          ),
-      ],
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ─── 드래그 핸들러(선택) ───────────────────────────────────────────
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+
+            // ─── 타이틀 ─────────────────────────────────────────────────────
+            Text(
+              '“${widget.pot.creatorName}” 님의 팟에 참여하기',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+
+            // ─── 출발/도착 주소 표시 ─────────────────────────────────────────────
+            Text(
+              '출발: ${widget.pot.originAddress}\n도착: ${widget.pot.destAddress}',
+              style: const TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 20),
+
+            // ─── 참여하기 버튼 ────────────────────────────────────────────────
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _isRequesting ? null : _handleJoin,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: _isRequesting
+                    ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+                    : const Text('참여하기'),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // ─── 에러 메시지가 있을 때 표시 ───────────────────────────────────────
+            if (_errorMessage != null) ...[
+              Text(
+                _errorMessage!,
+                style: const TextStyle(color: Colors.red),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            // ─── 취소 버튼 ────────────────────────────────────────────────────
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: const Text('취소'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

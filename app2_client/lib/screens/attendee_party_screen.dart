@@ -42,24 +42,27 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
     // 구독 로직을 함수로 분리
     void _doSubscribe() {
       if (!_subscribed) {
-        // 1) 파티 멤버 업데이트 브로드캐스트 구독
+        // 1) 파티 멤버 업데이트(브로드캐스트) 구독
         SocketService.subscribePartyMembers(
           partyId: int.parse(widget.partyId),
           onMessage: (_) => _fetchParty(),
         );
 
-        // 2) 개인적인 참여 요청 응답 구독
+        // 2) 개인적인 참여 요청 응답 구독 (여기서는 이미 승인이 됐으므로 실제로는 ACCEPTED를 받을 일은 거의 없지만,
+        //    혹시 나중에 “REJECTED” 메시지가 들어오면 토스트로 띄우거나 해줄 수도 있다.)
         SocketService.subscribeJoinRequestResponse(onMessage: (msg) {
-          final status = msg['status'] as String;
-          if (status == 'ACCEPTED') {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('참여 요청이 수락되었어!')),
-            );
-            _fetchParty();
-          } else if (status == 'REJECTED') {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('참여 요청이 거절되었어.')),
-            );
+          final int partyId = msg['partyId'] as int;
+          final String status = msg['status'] as String;
+          if (partyId == int.parse(widget.partyId)) {
+            if (status == 'ACCEPTED') {
+              // (이미 화면이 AttendeePartyScreen이라서 굳이 이동은 안 해도 되지만,
+              //  혹시 뒤로 가 있었다면 다시 불러올 수도 있다.)
+              _fetchParty();
+            } else if (status == 'REJECTED') {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('참여 요청이 거절되었어.')),
+              );
+            }
           }
         });
 
@@ -67,12 +70,12 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
       }
     }
 
-    // STOMP 연결 시도
+    // 1) STOMP 연결 시도 → 처음 연결되면 onConnect에서 _doSubscribe() 호출
     SocketService.connect(token, onConnect: () {
       _doSubscribe();
     });
 
-    // 이미 연결되어 있으면 바로 구독
+    // 2) 이미 연결된 상태라면(onConnect이 안 불릴 수 있음) 바로 구독
     if (SocketService.connected) {
       _doSubscribe();
     }
@@ -100,6 +103,8 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
 
   @override
   void dispose() {
+    // 현재는 화면을 떠날 때 STOMP 연결을 끊도록 구현.
+    // (필요하다면, 구독만 해제하는 방식으로 수정 가능)
     SocketService.disconnect();
     super.dispose();
   }
