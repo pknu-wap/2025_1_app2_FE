@@ -1,6 +1,9 @@
 // lib/screens/attendee_party_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:webview_flutter/webview_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:app2_client/models/party_detail_model.dart';
 import 'package:app2_client/services/party_service.dart';
 import 'package:app2_client/services/socket_service.dart';
@@ -27,6 +30,10 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
   bool _loading = true;
   bool _subscribed = false;
 
+  // WebView 관련
+  WebViewController? _mapController;
+  bool _mapLoaded = false;
+
   @override
   void initState() {
     super.initState();
@@ -34,6 +41,7 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
     _fetchParty();
   }
 
+  /// STOMP 구독
   void _connectAndSubscribe() {
     final token =
         Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
@@ -48,7 +56,7 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
         SocketService.subscribeJoinRequestResponse(onMessage: (msg) {
           final int partyId = msg['partyId'] as int;
           final String status = msg['status'] as String;
-          if (partyId == int.parse(widget.partyId)) {
+          if (partyId.toString() == widget.partyId) {
             if (status == 'ACCEPTED') {
               _fetchParty();
             } else if (status == 'REJECTED') {
@@ -71,6 +79,7 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
     }
   }
 
+  /// PartyDetail 불러오기
   Future<void> _fetchParty() async {
     setState(() => _loading = true);
     try {
@@ -79,6 +88,8 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
         setState(() {
           party = fetched;
         });
+        // 파티 정보를 받았으면 지도를 초기화
+        _initMapWebView();
       }
     } catch (e) {
       if (mounted) {
@@ -97,6 +108,61 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
     super.dispose();
   }
 
+  /// WebView(카카오 지도) 초기화 및 HTML 로드
+  Future<void> _initMapWebView() async {
+    if (party == null) return;
+
+    // HTML 템플릿 불러오기
+    final raw = await rootBundle.loadString('assets/kakao_party_map.html');
+    final kakaoKey = dotenv.env['KAKAO_JS_KEY'] ?? '';
+
+    // 출발지(origin)와 도착지(dest) 좌표로 치환
+    final centerLat = party!.destLat;
+    final centerLng = party!.destLng;
+    final html = raw
+        .replaceAll('{{KAKAO_JS_KEY}}', kakaoKey)
+        .replaceAll('{{CENTER_LAT}}', centerLat.toString())
+        .replaceAll('{{CENTER_LNG}}', centerLng.toString());
+
+    final wc = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(const Color(0x00000000))
+      ..setNavigationDelegate(
+        NavigationDelegate(onPageFinished: (_) {
+          setState(() {
+            _mapLoaded = true;
+          });
+          _renderMarkers();
+        }),
+      )
+      ..loadHtmlString(html, baseUrl: 'about:blank');
+
+    setState(() {
+      _mapController = wc;
+    });
+  }
+
+  /// 출발지/도착지에 마커 추가
+  void _renderMarkers() {
+    if (_mapController == null || party == null) return;
+
+    // 출발지(파란색) 마커
+    final oLat = party!.originLat;
+    final oLng = party!.originLng;
+    final dLat = party!.destLat;
+    final dLng = party!.destLng;
+
+    final jsOrigin = '''
+      addMarker("origin", $oLat, $oLng, "출발지", "blue");
+    ''';
+    final jsDest = '''
+      addMarker("destination", $dLat, $dLng, "도착지", "red");
+    ''';
+
+    _mapController!.runJavaScript(jsOrigin);
+    _mapController!.runJavaScript(jsDest);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading || party == null) {
@@ -107,75 +173,94 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.isHost ? '내 파티 관리' : '파티 상세정보'),
+        centerTitle: true,
+        title: const Text('내 파티'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ─── 기본 정보 ─────────────────────────────────────────────
-            Text(
-              '출발지',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            // ─── 지도 영역 ───────────────────────────────────────────────────
+            Container(
+              height: 240,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: Colors.grey[200],
+              ),
+              clipBehavior: Clip.hardEdge,
+              child: _mapController == null
+                  ? const Center(child: CircularProgressIndicator())
+                  : WebViewWidget(controller: _mapController!),
             ),
-            const SizedBox(height: 4),
-            Text(party!.originAddress, style: TextStyle(fontSize: 14)),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
 
-            Text(
-              '도착지',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            const SizedBox(height: 4),
-            Text(party!.destAddress, style: TextStyle(fontSize: 14)),
-            const SizedBox(height: 12),
-
-            Text(
-              '반경: ${party!.radius} km',
-              style: TextStyle(fontSize: 14),
-            ),
-            const SizedBox(height: 8),
-
-            Text(
-              '최대 인원: ${party!.maxPerson}명',
-              style: TextStyle(fontSize: 14),
-            ),
-            const SizedBox(height: 8),
-
-            Text(
-              '옵션: ${party!.partyOption}',
-              style: TextStyle(fontSize: 14),
+            // ─── 최대 인원 및 팟 옵션(성별) ────────────────────────────────────────────
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '최대 인원',
+                      style:
+                      TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${party!.maxPerson}명',
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  ],
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '팟 옵션',
+                      style:
+                      TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      party!.partyOption,
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  ],
+                ),
+              ],
             ),
             const SizedBox(height: 24),
-
             const Divider(),
             const SizedBox(height: 12),
 
-            // ─── 파티원 목록 ─────────────────────────────────────────────
+            // ─── 파티원 목록 ─────────────────────────────────────────────────────
             const Text(
               '파티원 목록',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
             const SizedBox(height: 8),
 
-            // 각 멤버를 Card 안에 ListTile 형태로 감싼다.
             ...party!.members.map((m) {
               return Card(
                 margin: const EdgeInsets.symmetric(vertical: 6),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
                 child: ListTile(
                   leading: Icon(
                     m.gender == 'FEMALE' ? Icons.female : Icons.male,
                     color: m.gender == 'FEMALE' ? Colors.pink : Colors.blue,
                   ),
-                  title: Text(m.name),
+                  title: Text(
+                    m.name,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
                   subtitle: Text('${m.email} (${m.role})'),
-                  // 호스트 자격이면 정산자 지정 버튼 대신 없애거나 표시하지 않음
                 ),
               );
             }).toList(),
-
-            const SizedBox(height: 24),
           ],
         ),
       ),
