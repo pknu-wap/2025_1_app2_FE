@@ -82,7 +82,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
         //   "partyId": 84
         // }
 
-        // ① 들어온 메시지의 partyId 와 현재 화면의 _party.partyId 를 비교
+        // ① 들어온 메시지의 partyId와 현재 화면의 _party.partyId를 비교
         final incomingPartyId = msg['partyId']?.toString();
         if (incomingPartyId == _party.partyId.toString()) {
           // ② 파티 ID가 일치할 때만 리스트에 추가
@@ -97,7 +97,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
         } else {
           // 파티 ID가 다르면 무시
           debugPrint(
-              '🔕 다른 파티(${incomingPartyId}) 요청이라 무시: 현재 파티=${_party.partyId}');
+              '🔕 다른 파티($incomingPartyId) 요청이라 무시: 현재 파티=${_party.partyId}');
         }
       });
 
@@ -112,7 +112,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
             );
             setState(() {
               _party = updated;
-              // 필요하다면 _stopoverList 도 갱신
+              // 필요하다면 _stopoverList도 갱신
             });
             _refreshAllMarkers();
           }
@@ -123,7 +123,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
       debugPrint('✅ 소켓 구독 완료 - 파티 ID: ${_party.partyId}');
     }
 
-    // 1) STOMP 연결 시도 → onConnect 에서 _doSubscribe() 호출
+    // 1) STOMP 연결 시도 → onConnect에서 _doSubscribe() 호출
     SocketService.connect(token, onConnect: () {
       _doSubscribe();
     });
@@ -169,7 +169,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
     if (!_mapLoaded || _mapController == null) return;
 
     try {
-      // 1) 기존 마커 제거
+      // 1) 기존 마커 모두 제거
       for (final stop in _stopoverList) {
         await _mapController!
             .runJavaScript('removeMarker("${stop.stopover.id}");');
@@ -184,7 +184,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
         'addMarker("destination", $destLat, $destLng, "도착지", "red");',
       );
 
-      // 3) 경유지(초록색) 마커 찍기
+      // 3) 각 경유지(초록색) 마커 찍기
       for (final stop in _stopoverList) {
         final id = stop.stopover.id.toString();
         final lat = stop.stopover.location.lat;
@@ -213,7 +213,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
       setState(() {
         _joinRequests.removeWhere((r) => r.requestId == requestId);
       });
-      // 구독 중인 subscribePartyMembers가 MEMBER_JOIN 브로드캐스트를 받아와서 자동으로 _party 갱신
+      // MEMBER_JOIN 브로드캐스트를 받아 자동으로 _party 갱신됨
     } catch (e) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('수락 실패: $e')));
@@ -326,7 +326,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
 
                   const SizedBox(height: 24),
 
-                  // ─── 필터링된 “신규 참여요청” ─────────────────────────────────────
+                  // ─── 오직 “내 파티의 ID”로 온 요청만 보여줌 ───────────────────────────
                   if (_joinRequests.isNotEmpty) ...[
                     const Divider(),
                     const SizedBox(height: 8),
@@ -350,8 +350,8 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                                     _acceptRequest(req.requestId),
                               ),
                               IconButton(
-                                icon:
-                                const Icon(Icons.close, color: Colors.red),
+                                icon: const Icon(Icons.close,
+                                    color: Colors.red),
                                 onPressed: () =>
                                     _rejectRequest(req.requestId),
                               ),
