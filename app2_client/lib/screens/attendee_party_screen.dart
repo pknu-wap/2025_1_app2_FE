@@ -34,72 +34,18 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
   WebViewController? _mapController;
   bool _mapLoaded = false;
 
+  /// 현재 로그인된 사용자의 이메일을 가져옵니다.
+  /// AuthProvider.user 안에 UserModel이 들어있고,
+  /// UserModel.email 프로퍼티가 실제 사용자 이메일입니다.
+  String? get _currentUserEmail {
+    return Provider.of<AuthProvider>(context, listen: false).user?.email;
+  }
+
   @override
   void initState() {
     super.initState();
     _connectAndSubscribe();
     _fetchParty();
-  }
-
-  /// STOMP 구독
-  void _connectAndSubscribe() {
-    final token =
-        Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
-    if (token == null) return;
-
-    void _doSubscribe() {
-      if (!_subscribed) {
-        SocketService.subscribePartyMembers(
-          partyId: int.parse(widget.partyId),
-          onMessage: (_) => _fetchParty(),
-        );
-        SocketService.subscribeJoinRequestResponse(onMessage: (msg) {
-          final int partyId = msg['partyId'] as int;
-          final String status = msg['status'] as String;
-          if (partyId.toString() == widget.partyId) {
-            if (status == 'ACCEPTED') {
-              _fetchParty();
-            } else if (status == 'REJECTED') {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('참여 요청이 거절되었어.')),
-              );
-            }
-          }
-        });
-        _subscribed = true;
-      }
-    }
-
-    SocketService.connect(token, onConnect: () {
-      _doSubscribe();
-    });
-
-    if (SocketService.connected) {
-      _doSubscribe();
-    }
-  }
-
-  /// PartyDetail 불러오기
-  Future<void> _fetchParty() async {
-    setState(() => _loading = true);
-    try {
-      final fetched = await PartyService.fetchPartyDetailById(widget.partyId);
-      if (mounted) {
-        setState(() {
-          party = fetched;
-        });
-        // 파티 정보를 받았으면 지도를 초기화
-        _initMapWebView();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('파티 정보를 불러올 수 없어: $e')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
   }
 
   @override
@@ -108,15 +54,98 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
     super.dispose();
   }
 
+  /// STOMP 구독 (파티 멤버 변경, 참여 요청 응답)
+  void _connectAndSubscribe() {
+    final token =
+        Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
+    if (token == null) return;
+
+    void _doSubscribe() {
+      if (_subscribed) return;
+
+      // 1) 파티 멤버 업데이트 브로드캐스트 구독
+      SocketService.subscribePartyMembers(
+        partyId: int.parse(widget.partyId),
+        onMessage: (_) => _fetchParty(),
+      );
+
+      // 2) 참여 요청 응답 구독
+      SocketService.subscribeJoinRequestResponse(onMessage: (msg) {
+        final incomingPartyId = msg['partyId']?.toString();
+        final status = msg['status'] as String? ?? '';
+        final requesterEmail = msg['requesterEmail'] as String? ?? '';
+
+        // “내 요청”인지, “내가 보고 있는 파티”인지 확인
+        if (incomingPartyId == widget.partyId &&
+            requesterEmail == _currentUserEmail) {
+          if (status == 'PENDING') {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('참여 요청을 보냈습니다.')),
+              );
+            }
+          } else if (status == 'ACCEPTED') {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('참여 요청이 수락되었습니다!')),
+              );
+              _fetchParty();
+            }
+          } else if (status == 'REJECTED') {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('참여 요청이 거절되었습니다.')),
+              );
+            }
+          }
+        }
+      });
+
+      _subscribed = true;
+    }
+
+    SocketService.connect(token, onConnect: () {
+      _doSubscribe();
+    });
+    if (SocketService.connected) {
+      _doSubscribe();
+    }
+  }
+
+  /// PartyDetail을 서버에서 조회하고, 화면-지도 초기화
+  Future<void> _fetchParty() async {
+    setState(() => _loading = true);
+    try {
+      final fetched = await PartyService.fetchPartyDetailById(widget.partyId);
+      if (mounted) {
+        setState(() {
+          party = fetched;
+        });
+        // 화면이 렌더링된 이후에 지도(WebView)를 초기화
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _initMapWebView();
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('파티 정보를 불러올 수 없습니다: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   /// WebView(카카오 지도) 초기화 및 HTML 로드
   Future<void> _initMapWebView() async {
     if (party == null) return;
 
-    // HTML 템플릿 불러오기
+    // HTML 템플릿을 assets에서 불러옵니다.
     final raw = await rootBundle.loadString('assets/kakao_party_map.html');
     final kakaoKey = dotenv.env['KAKAO_JS_KEY'] ?? '';
 
-    // 출발지(origin)와 도착지(dest) 좌표로 치환
+    // 파티의 도착지 좌표로 중심을 설정
     final centerLat = party!.destLat;
     final centerLng = party!.destLng;
     final html = raw
@@ -127,6 +156,12 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
     final wc = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0x00000000))
+      ..addJavaScriptChannel(
+        'MarkerClick',
+        onMessageReceived: (msg) {
+          // 필요하다면 마커 클릭 시 로직 추가
+        },
+      )
       ..setNavigationDelegate(
         NavigationDelegate(onPageFinished: (_) {
           setState(() {
@@ -142,11 +177,10 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
     });
   }
 
-  /// 출발지/도착지에 마커 추가
+  /// 출발지(origin)와 도착지(destination)에 마커를 추가합니다.
   void _renderMarkers() {
     if (_mapController == null || party == null) return;
 
-    // 출발지(파란색) 마커
     final oLat = party!.originLat;
     final oLng = party!.originLng;
     final dLat = party!.destLat;
@@ -181,7 +215,7 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ─── 지도 영역 ───────────────────────────────────────────────────
+            // ─── 지도 영역 ───────────────────────────────────────────
             Container(
               height: 240,
               decoration: BoxDecoration(
@@ -195,7 +229,7 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
             ),
             const SizedBox(height: 16),
 
-            // ─── 최대 인원 및 팟 옵션(성별) ────────────────────────────────────────────
+            // ─── 최대 인원 / 팟 옵션 ───────────────────────────────────
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -235,13 +269,12 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
             const Divider(),
             const SizedBox(height: 12),
 
-            // ─── 파티원 목록 ─────────────────────────────────────────────────────
+            // ─── 파티원 목록 ───────────────────────────────────────
             const Text(
               '파티원 목록',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
             const SizedBox(height: 8),
-
             ...party!.members.map((m) {
               return Card(
                 margin: const EdgeInsets.symmetric(vertical: 6),
