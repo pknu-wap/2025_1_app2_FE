@@ -1,7 +1,13 @@
+// lib/screens/attendee_report_screen.dart
+
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:dio/dio.dart';
+import 'package:app2_client/providers/auth_provider.dart';
+import 'package:app2_client/services/dio_client.dart';
 
 class ReportScreen extends StatefulWidget {
-  final String reportedUserName;
+  final String reportedUserName;  // 신고 대상자 이메일 또는 아이디
   final String messageContent;
   final DateTime? messageTimestamp;
 
@@ -19,6 +25,7 @@ class ReportScreen extends StatefulWidget {
 class _ReportScreenState extends State<ReportScreen> {
   final TextEditingController _controller = TextEditingController();
   int _charCount = 0;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -36,14 +43,58 @@ class _ReportScreenState extends State<ReportScreen> {
     super.dispose();
   }
 
-  void _submitReport() {
-    final text = _controller.text.trim();
-    if (text.isNotEmpty) {
-      // TODO: 서버에 신고 내용 전송
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("신고가 접수되었습니다.")),
+  Future<void> _submitReport() async {
+    final content = _controller.text.trim();
+    if (content.isEmpty) return;
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      // 1) 현재 로그인 사용자의 accessToken 가져오기
+      final token =
+          Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
+      if (token == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('로그인 정보가 없습니다.')),
+        );
+        return;
+      }
+
+      // 2) POST /api/report 요청
+      final dio = DioClient.dio;
+      final response = await dio.post(
+        '/api/report',
+        data: {
+          'email': widget.reportedUserName,
+          'content': content,
+        },
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
       );
-      Navigator.pop(context);  // 신고 완료 후 이전 화면으로 돌아가기
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('신고가 접수되었습니다.')),
+        );
+        Navigator.pop(context);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('신고 실패: ${response.statusCode}')),
+        );
+      }
+    } on DioError catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('신고 중 오류 발생: ${e.message}')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
   }
 
@@ -110,19 +161,18 @@ class _ReportScreenState extends State<ReportScreen> {
             ),
             const SizedBox(height: 20),
 
-            // 본문 설명
+            // 설명 텍스트
             const Text(
               '택시팟 채팅방에서 본 목적과 관련 없는 채팅을 받으면 상대방을 신고할 수 있어요. '
-              '원하지 않는 채팅을 받아 불쾌하다면 신고할 수 있어요.',
+                  '원하지 않는 채팅을 받아 불쾌하다면 신고할 수 있어요.',
               style: TextStyle(
                 fontSize: 15,
                 color: Colors.grey,
               ),
             ),
-
             const SizedBox(height: 30),
 
-            // 입력창
+            // 신고 내용 입력창
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -132,23 +182,22 @@ class _ReportScreenState extends State<ReportScreen> {
               child: TextField(
                 controller: _controller,
                 maxLines: 6,
-                maxLength: 300,
+                maxLength: 500,
                 decoration: const InputDecoration(
                   border: InputBorder.none,
-                  hintText: '신고 내용을 입력해주세요. (최대 300자)',
+                  hintText: '신고 내용을 입력해주세요. (최대 500자)',
                   hintStyle: TextStyle(color: Colors.grey),
                   counterText: '',
                 ),
               ),
             ),
-
             const SizedBox(height: 5),
 
             // 글자 수 표시
             Align(
               alignment: Alignment.centerRight,
               child: Text(
-                '$_charCount/300',
+                '$_charCount/500',
                 style: TextStyle(color: Colors.grey.shade600),
               ),
             ),
@@ -160,14 +209,23 @@ class _ReportScreenState extends State<ReportScreen> {
               width: double.infinity,
               height: 55,
               child: ElevatedButton(
-                onPressed: _submitReport,
+                onPressed: _isSubmitting ? null : _submitReport,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFF443A), // 빨간색
+                  backgroundColor: const Color(0xFFFF443A),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                child: const Text(
+                child: _isSubmitting
+                    ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+                    : const Text(
                   '신고하기',
                   style: TextStyle(
                     fontSize: 16,
