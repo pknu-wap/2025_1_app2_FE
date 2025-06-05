@@ -146,7 +146,7 @@ class _PartyMapScreenState extends State<PartyMapScreen> {
   /// 서버에서 파티 목록을 가져와 _pots 업데이트 (토큰 포함)
   Future<void> _loadPots() async {
     if (!mounted) return;
-    
+
     final token =
         Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
     if (token == null) {

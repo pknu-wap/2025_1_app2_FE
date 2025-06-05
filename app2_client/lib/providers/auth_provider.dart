@@ -1,4 +1,5 @@
 // lib/providers/auth_provider.dart
+
 import 'package:app2_client/models/user_model.dart';
 import 'package:app2_client/services/auth_service.dart';
 import 'package:app2_client/services/secure_storage_service.dart';
@@ -26,34 +27,40 @@ class AuthProvider extends ChangeNotifier {
     return _tokens!.jwt;
   }
 
-  /// 로그인 + 서버 인증
-  /// @deprecated 예정
-  Future<String?> login() async {
-    final u = await _authService.loginWithGoogle();
-    if (u == null) return null;  // 구글 로그인 취소 시 null 반환
+  /// 사용자 이메일 편의 getter
+  String? get email => _user?.email;
 
+  /// 로그인 + 서버 인증
+  Future<String?> login() async {
+    // 1) Google 로그인 시도
+    final u = await _authService.loginWithGoogle();
+    if (u == null) return null;  // 사용자가 취소한 경우
+
+    // 2) UserModel에 로그인된 사용자 정보 저장
     _user = u;
 
+    // 3) 서버에 idToken/accessToken을 보내서 JWT 발급 요청
     final resp = await _authService.loginOnServer(
       idToken: u.idToken,
       accessToken: u.accessToken,
     );
 
+    // 4) 서버가 성공적으로 JWT를 내려준 경우
     if (resp != null && resp.statusCode == 200) {
       _tokens = resp;
-      
-      // 사용자 정보 저장
+
+      // 사용자 정보(이메일, 이름)를 서버에 저장
       print('🔄 사용자 정보 저장 시도');
       print('   ▶ userId: ${u.email}');
       print('   ▶ userName: ${u.name}');
-      
+
       await _authService.saveUserInfo(
-        userId: u.email, // 이메일을 userId로 사용
+        userId: u.email,
         userName: u.name,
       );
-      
+
       print('✅ 사용자 정보 저장 완료');
-      
+
       notifyListeners();
       return 'SUCCESS';
     } else if (resp?.statusCode == 404) {
@@ -63,8 +70,7 @@ class AuthProvider extends ChangeNotifier {
     return 'ERROR';
   }
 
-  /// 회원가입 완료
-  /// @deprecated 예정
+  /// 회원가입 완료 (사용자 정보를 서버에 등록)
   Future<bool> completeSignup({
     required String name,
     required String phone,
@@ -90,7 +96,6 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     }
-
     return false;
   }
 
@@ -99,13 +104,20 @@ class AuthProvider extends ChangeNotifier {
     final storage = SecureStorageService();
     final accessToken = await storage.getAccessToken();
     final refreshToken = await storage.getRefreshToken();
-    if (accessToken != null && accessToken.isNotEmpty && refreshToken != null && refreshToken.isNotEmpty) {
-      _tokens = AuthResponse(statusCode: 200, accessToken: accessToken, refreshToken: refreshToken);
+    if (accessToken != null &&
+        accessToken.isNotEmpty &&
+        refreshToken != null &&
+        refreshToken.isNotEmpty) {
+      _tokens = AuthResponse(
+        statusCode: 200,
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+      );
       notifyListeners();
     }
   }
 
-  /// 로그아웃: 토큰/유저 상태 초기화 및 AuthService.logout 호출
+  /// 로그아웃: 토큰/유저 정보 초기화 및 AuthService.logout 호출
   Future<void> logout() async {
     await _authService.logout();
     _tokens = null;

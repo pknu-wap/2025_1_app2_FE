@@ -12,5 +12,6 @@ class DioClient {
         'Content-Type': 'application/json',
       },
     ),
-  )..interceptors.add((TokenInterceptor()));
+  )
+    ..interceptors.add(TokenInterceptor());
 }

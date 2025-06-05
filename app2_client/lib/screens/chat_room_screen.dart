@@ -1,15 +1,13 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'package:flutter_secure_storage/flutter_secure_storage.dart'; // For JWT storage
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:app2_client/screens/report_screen.dart';
 import 'package:app2_client/services/secure_storage_service.dart';
-import 'package:app2_client/screens/my_page_popup.dart';  // 추가
-import 'dart:async';
+import 'package:app2_client/providers/auth_provider.dart';
+import 'package:app2_client/screens/my_page_popup.dart';
 
 class ChatRoomScreen extends StatefulWidget {
   final String roomId;
@@ -24,13 +22,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   final ScrollController _scrollController = ScrollController();
   String? currentUserId;
   String? currentUserName;
-  Map<String, String> userNames = {};  // userId to name mapping
-  bool isUserInfoLoaded = false;  // 사용자 정보 로딩 상태 추가
+  Map<String, String> userNames = {}; // userId → 이름 맵
+  bool isUserInfoLoaded = false;      // 사용자 정보 로딩 완료 여부
 
   @override
   void initState() {
     super.initState();
-    initializeDateFormatting('ko_KR', null);  // 한국어 날짜 포맷 초기화
+    initializeDateFormatting('ko_KR', null);
     _getCurrentUser();
     _loadPartyMembers();
   }
@@ -44,17 +42,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   Future<void> _getCurrentUser() async {
     final storage = SecureStorageService();
-    print('🔍 사용자 정보 로딩 시작');
-    
     currentUserId = await storage.getUserId();
-    print('📱 userId: $currentUserId');
-    
     currentUserName = await storage.getUserName();
-    print('📱 userName: $currentUserName');
-    
     setState(() {
       isUserInfoLoaded = currentUserId != null && currentUserName != null;
-      print('✅ 사용자 정보 로딩 완료: $isUserInfoLoaded');
     });
   }
 
@@ -64,7 +55,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           .collection('parties')
           .doc(widget.roomId)
           .get();
-      
+
       if (partyDoc.exists) {
         final members = partyDoc.data()?['members'] as List<dynamic>?;
         if (members != null) {
@@ -80,33 +71,24 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   Future<void> _sendMessage(String text) async {
     if (!mounted) return;
-    
+
     try {
       final now = DateTime.now();
-      final message = {
-        'text': text,
-        'senderId': currentUserId,
-        'senderName': currentUserName,
-        'timestamp': now,  // 서버 타임스탬프 대신 현재 시간 사용
-        'clientTimestamp': now,  // 클라이언트 타임스탬프도 동일한 시간 사용
-      };
-
-      // 메시지 전송
-      final docRef = await FirebaseFirestore.instance
+      await FirebaseFirestore.instance
           .collection('chat_rooms')
           .doc(widget.roomId)
           .collection('messages')
           .add({
-            'text': text,
-            'senderId': currentUserId,
-            'senderName': currentUserName,
-            'timestamp': FieldValue.serverTimestamp(),  // 서버 타임스탬프는 백그라운드에서 업데이트
-            'clientTimestamp': Timestamp.fromDate(now),  // 클라이언트 타임스탬프는 즉시 설정
-          });
+        'text': text,
+        'senderId': currentUserId,
+        'senderName': currentUserName,
+        'timestamp': FieldValue.serverTimestamp(),
+        'clientTimestamp': Timestamp.fromDate(now),
+      });
 
       _controller.clear();
-      
-      // 스크롤을 즉시 아래로 이동
+
+      // 스크롤을 맨 밑으로 이동
       if (_scrollController.hasClients) {
         await _scrollController.animateTo(
           _scrollController.position.maxScrollExtent + 100,
@@ -127,11 +109,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: BackButton(
-          onPressed: () {
-            Navigator.pop(context);
-          },
-        ),
+        leading: BackButton(onPressed: () => Navigator.pop(context)),
         title: const Text(
           '채팅방',
           style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
@@ -151,6 +129,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       ),
       body: Column(
         children: [
+          // ─── 메시지 목록 ─────────────────────────────────────────────────────
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
@@ -163,9 +142,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 if (!snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                
+
                 final messages = snapshot.data!.docs;
-                
+
                 // 새 메시지가 오면 자동으로 스크롤
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (_scrollController.hasClients) {
@@ -184,23 +163,26 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                   thumbVisibility: true,
                   child: ListView.builder(
                     controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 16, horizontal: 16),
                     itemCount: messages.length,
                     itemBuilder: (context, index) {
                       final doc = messages[index];
                       final data = doc.data() as Map<String, dynamic>;
                       final senderId = data['senderId'] ?? '';
-                      final senderName = data['senderName'] ?? userNames[senderId] ?? '알 수 없음';
+                      final senderName =
+                          data['senderName'] ?? userNames[senderId] ?? '알 수 없음';
                       final timestamp = data['timestamp'] as Timestamp?;
                       final clientTimestamp = data['clientTimestamp'] as Timestamp?;
-                      
+
                       return ChatBubble(
-                        key: ValueKey('${doc.id}_${clientTimestamp?.millisecondsSinceEpoch}'),
+                        key: ValueKey(
+                            '${doc.id}_${clientTimestamp?.millisecondsSinceEpoch}'),
                         isMine: senderId == currentUserId,
                         name: senderName,
                         message: data['text'] ?? '',
-                        timestamp: timestamp is Timestamp ? timestamp : (clientTimestamp ?? Timestamp.now()),
-                        clientTimestamp: clientTimestamp ?? Timestamp.now(),
+                        timestamp: timestamp as Timestamp?,
+                        clientTimestamp: clientTimestamp,
                         senderId: senderId,
                       );
                     },
@@ -210,7 +192,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             ),
           ),
 
-          // 메시지 입력창
+          // ─── 메시지 입력란 ─────────────────────────────────────────────────
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             color: Colors.grey.shade200,
@@ -220,10 +202,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                   child: TextField(
                     controller: _controller,
                     decoration: InputDecoration(
-                      hintText: isUserInfoLoaded ? '메시지를 입력하세요' : '사용자 정보를 불러오는 중...',
+                      hintText: isUserInfoLoaded
+                          ? '메시지를 입력하세요'
+                          : '사용자 정보를 불러오는 중...',
                       filled: true,
                       fillColor: Colors.white,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                      contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(30),
                         borderSide: const BorderSide(color: Colors.blue),
@@ -233,7 +218,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton(
-                  onPressed: !isUserInfoLoaded ? null : () {
+                  onPressed: !isUserInfoLoaded
+                      ? null
+                      : () {
                     final text = _controller.text.trim();
                     if (text.isNotEmpty) {
                       _sendMessage(text);
@@ -256,7 +243,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   }
 }
 
-// 말풍선 위젯
+/// 말풍선(채팅) 위젯
 class ChatBubble extends StatefulWidget {
   final bool isMine;
   final String name;
@@ -282,7 +269,7 @@ class ChatBubble extends StatefulWidget {
 class _ChatBubbleState extends State<ChatBubble> {
   late String timeString;
   Timer? _timer;
-  bool isSelected = false;  // 메시지가 선택되었는지 여부
+  bool isSelected = false; // 메시지 선택(신고 토글) 여부
 
   @override
   void initState() {
@@ -308,29 +295,26 @@ class _ChatBubbleState extends State<ChatBubble> {
     if (effectiveTimestamp == null) {
       return '';
     }
-
     final messageTime = effectiveTimestamp.toDate();
     final now = DateTime.now();
-    
-    if (messageTime.year == now.year && 
-        messageTime.month == now.month && 
+
+    if (messageTime.year == now.year &&
+        messageTime.month == now.month &&
         messageTime.day == now.day) {
       return DateFormat('a h:mm', 'ko_KR').format(messageTime);
-    } 
-    else if (messageTime.year == now.year) {
+    } else if (messageTime.year == now.year) {
       return DateFormat('M/d a h:mm', 'ko_KR').format(messageTime);
-    }
-    else {
+    } else {
       return DateFormat('y/M/d a h:mm', 'ko_KR').format(messageTime);
     }
   }
 
+  /// 길게 누르면 신고 버튼이 표시됨
   void _showReportButton() {
-    if (!widget.isMine) {  // 자신의 메시지는 신고할 수 없음
+    if (!widget.isMine) {
       setState(() {
         isSelected = true;
       });
-      // 3초 후 자동으로 선택 해제
       Future.delayed(const Duration(seconds: 3), () {
         if (mounted) {
           setState(() {
@@ -346,6 +330,7 @@ class _ChatBubbleState extends State<ChatBubble> {
       context,
       MaterialPageRoute(
         builder: (context) => ReportScreen(
+          reportedUserEmail: widget.senderId,    // 실제 이메일 값을 넘겨 줘야 합니다.
           reportedUserName: widget.name,
           messageContent: widget.message,
           messageTimestamp: (widget.clientTimestamp ?? widget.timestamp)?.toDate(),
@@ -353,14 +338,15 @@ class _ChatBubbleState extends State<ChatBubble> {
       ),
     );
     setState(() {
-      isSelected = false;  // 신고 화면으로 이동 후 선택 상태 해제
+      isSelected = false;
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final bubbleColor = widget.isMine ? Colors.amber : Colors.grey.shade300;
-    final alignment = widget.isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start;
+    final alignment =
+    widget.isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start;
     final margin = widget.isMine
         ? const EdgeInsets.only(left: 80, top: 8, bottom: 8)
         : const EdgeInsets.only(right: 80, top: 8, bottom: 8);
@@ -384,7 +370,8 @@ class _ChatBubbleState extends State<ChatBubble> {
                       decoration: BoxDecoration(
                         color: isSelected ? Colors.grey.shade400 : bubbleColor,
                         borderRadius: BorderRadius.circular(16),
-                        border: isSelected ? Border.all(color: Colors.red, width: 2) : null,
+                        border:
+                        isSelected ? Border.all(color: Colors.red, width: 2) : null,
                       ),
                       child: Text(widget.message),
                     ),
