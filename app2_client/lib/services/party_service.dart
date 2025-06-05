@@ -5,7 +5,6 @@ import 'package:app2_client/constants/api_constants.dart';
 import 'package:app2_client/models/party_model.dart';
 import 'package:app2_client/models/party_create_request.dart';
 import 'package:app2_client/models/party_detail_model.dart';
-import 'package:app2_client/models/stopover_model.dart';
 import 'package:app2_client/models/location_model.dart';
 import 'package:app2_client/services/dio_client.dart';
 import 'package:app2_client/services/socket_service.dart';
@@ -202,63 +201,6 @@ class PartyService {
     return PartyDetail.fromJson(response.data as Map<String, dynamic>);
   }
 
-  /// 경유지 추가 (POST /api/party/{partyId})
-  static Future<List<StopoverResponse>> addStopover({
-    required String partyId,
-    required String memberEmail,
-    required LocationModel location,
-    required String accessToken,
-  }) async {
-    final url = "${ApiConstants.partyEndpoint}/$partyId";
-    final body = {
-      "member_email": memberEmail,
-      "location": location.toJson(),
-    };
-    final response = await DioClient.dio.post(
-      url,
-      data: body,
-      options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
-    );
-    if (response.statusCode != 200) {
-      throw Exception('경유지 추가 실패: ${response.statusCode}');
-    }
-    final List<dynamic> arr = response.data as List<dynamic>;
-    return arr
-        .map((e) => StopoverResponse.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
-  /// 경유지 수정 (PATCH /api/party/{partyId})
-  static Future<List<StopoverResponse>> updateStopover({
-    required String partyId,
-    required int stopoverId,
-    String? memberEmail,
-    LocationModel? location,
-    required String accessToken,
-  }) async {
-    final url = "${ApiConstants.partyEndpoint}/$partyId";
-    final Map<String, dynamic> body = {
-      "stopover_id": stopoverId,
-      if (memberEmail != null) "member_email": memberEmail,
-      if (location != null) "location": location.toJson(),
-    };
-    final response = await DioClient.dio.patch(
-      url,
-      data: body,
-      options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
-    );
-    if (response.statusCode == 204) {
-      return <StopoverResponse>[];
-    }
-    if (response.statusCode != 200) {
-      throw Exception('경유지 수정 실패: ${response.statusCode}');
-    }
-    final List<dynamic> arr = response.data as List<dynamic>;
-    return arr
-        .map((e) => StopoverResponse.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
   /// 정산자 지정 (PATCH /api/party/{partyId}/member/{partyMemberId}/bookkeeper)
   static Future<List<PartyMember>> designateBookkeeper({
     required String partyId,
@@ -281,7 +223,7 @@ class PartyService {
   }
 
   // ──────────────────────────────────────────────────────────────────────────────
-  // ↓↓ 여기에 두 브랜치의 “요금 관련” 메서드를 모두 병합했습니다. ↓↓
+  // ↓↓ 여기에 두 브랜치의 "요금 관련" 메서드를 모두 병합했습니다. ↓↓
   // ──────────────────────────────────────────────────────────────────────────────
 
   /// (1) 요금 입력: 여러 경유지에 대한 요금을 일괄로 보내고, 서버에서 계산된 PaymentInfo 리스트를 반환받음
@@ -363,7 +305,7 @@ class PartyService {
   }
 
   /// (4) 단일 경유지 요금 입력: 간단히 stopoverId, fare만 보내고 void를 반환
-  ///   ※ “여러 경유지 요금을 한 번에 전송” 메서드 말고, 단일 경유지별로 보내고 싶을 때 사용
+  ///   ※ "여러 경유지 요금을 한 번에 전송" 메서드 말고, 단일 경유지별로 보내고 싶을 때 사용
   ///   - POST /api/party/{partyId}/fare/single
   static Future<void> submitSingleFare({
     required String partyId,

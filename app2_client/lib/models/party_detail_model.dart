@@ -1,7 +1,6 @@
 // lib/models/party_detail_model.dart
 
 import 'package:app2_client/models/party_member_model.dart';
-import 'package:app2_client/models/stopover_model.dart';
 import 'package:app2_client/models/party_option.dart';
 
 class PartyDetail {
@@ -16,7 +15,6 @@ class PartyDetail {
   final int maxPerson;
   final PartyOption partyOption;
   final List<PartyMember> members;
-  final List<StopoverResponse> stopovers;
 
   PartyDetail({
     required this.partyId,
@@ -30,7 +28,6 @@ class PartyDetail {
     required this.maxPerson,
     required this.partyOption,
     required this.members,
-    required this.stopovers,
   });
 
   factory PartyDetail.fromJson(Map<String, dynamic> json) {
@@ -51,11 +48,6 @@ class PartyDetail {
         .toList() ??
         [];
 
-    final stopoverList = (json['party_stopovers'] as List?)
-        ?.whereType<Map<String, dynamic>>()
-        .map((e) => StopoverResponse.fromJson(e))
-        .toList() ?? [];
-
     return PartyDetail(
       partyId: json['party_id'] as int,
       originAddress: originAddress,
@@ -68,7 +60,6 @@ class PartyDetail {
       maxPerson: json['party_max_people'] as int,
       partyOption: PartyOption.fromString(json['party_option'] as String),
       members: memberList,
-      stopovers: stopoverList,
     );
   }
 }
