@@ -115,7 +115,15 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
     }
 
     // partyOption 필터링 로직 추가
-    final userGender = Provider.of<AuthProvider>(context, listen: false).userGender; // 사용자 성별 정보 가져오기
+    final userGender = Provider.of<AuthProvider>(context, listen: false).userGender;
+    if (userGender == null) {
+      setState(() {
+        _isRequesting = false;
+        _errorMessage = '사용자 성별 정보를 가져올 수 없습니다.';
+      });
+      return;
+    }
+    
     if (widget.pot.partyOption == PartyOption.onlyMale && userGender != 'MALE') {
       setState(() {
         _isRequesting = false;

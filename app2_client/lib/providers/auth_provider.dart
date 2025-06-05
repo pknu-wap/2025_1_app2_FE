@@ -15,6 +15,7 @@ class AuthProvider extends ChangeNotifier {
 
   UserModel? get user => _user;
   AuthResponse? get tokens => _tokens;
+  String? get userGender => _user?.gender;
 
   /// 사용자 이메일 편의 getter
   String? get email => _user?.email;

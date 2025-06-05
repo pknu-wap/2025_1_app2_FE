@@ -73,11 +73,17 @@ class AuthService {
 
       _printIdTokenPayload(idToken);
 
+      // 사용자 프로필 정보 가져오기
+      final userInfo = await account.authentication;
+      final gender = userInfo.idToken != null ? 
+          _extractGenderFromIdToken(userInfo.idToken!) : null;
+
       return UserModel(
         email: account.email,
         name: account.displayName ?? '',
         idToken: idToken,
         accessToken: accessToken,
+        gender: gender,
       );
     } catch (e) {
       print('🔴 Google 로그인 실패: $e');
@@ -103,6 +109,24 @@ class AuthService {
       print('🕒 exp:   ${jsonPayload['exp']}');
     } catch (e) {
       print('❌ ID Token 디코딩 실패: $e');
+    }
+  }
+
+  // ID 토큰에서 성별 정보 추출
+  String? _extractGenderFromIdToken(String idToken) {
+    try {
+      final parts = idToken.split('.');
+      if (parts.length != 3) return null;
+      
+      final payload = parts[1];
+      final normalized = base64Url.normalize(payload);
+      final decoded = utf8.decode(base64Url.decode(normalized));
+      final data = json.decode(decoded);
+      
+      return data['gender'] as String?;
+    } catch (e) {
+      print('🔴 ID 토큰 파싱 실패: $e');
+      return null;
     }
   }
 

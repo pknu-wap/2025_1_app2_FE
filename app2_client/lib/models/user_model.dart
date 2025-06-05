@@ -4,11 +4,13 @@ class UserModel {
   final String name;
   final String idToken;
   final String accessToken;
+  final String? gender;
 
   UserModel({
     required this.email,
     required this.name,
     required this.idToken,
     required this.accessToken,
+    this.gender,
   });
 }
