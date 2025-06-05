@@ -2,7 +2,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:webview_flutter/webview_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:app2_client/models/party_detail_model.dart';
 import 'package:app2_client/services/party_service.dart';
@@ -10,7 +9,6 @@ import 'package:app2_client/services/socket_service.dart';
 import 'package:provider/provider.dart';
 import 'package:app2_client/providers/auth_provider.dart';
 import 'package:app2_client/screens/chat_room_screen.dart';
-import 'package:app2_client/screens/fare_setting_screen.dart';
 
 class AttendeePartyScreen extends StatefulWidget {
   final String partyId;
@@ -30,10 +28,6 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
   PartyDetail? party;
   bool _loading = true;
   bool _subscribed = false;
-
-  // WebView 관련
-  WebViewController? _mapController;
-  bool _mapLoaded = false;
 
   /// 현재 로그인된 사용자의 이메일을 가져옵니다.
   /// AuthProvider.user 안에 UserModel이 들어있고,
@@ -124,116 +118,11 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
         party = fetchedParty;
         _loading = false;
       });
-
-      // 파티원이 다 차면 정산 페이지로 이동
-      if (party != null && party!.members.length >= party!.maxPerson) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _showFareSettingDialog();
-        });
-      }
     } catch (e) {
       setState(() {
         _loading = false;
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('파티 정보 조회 실패: $e')),
-        );
-      }
     }
-  }
-
-  /// WebView(카카오 지도) 초기화 및 HTML 로드
-  Future<void> _initMapWebView() async {
-    if (party == null) return;
-
-    // HTML 템플릿을 assets에서 불러옵니다.
-    final raw = await rootBundle.loadString('assets/kakao_party_map.html');
-    final kakaoKey = dotenv.env['KAKAO_JS_KEY'] ?? '';
-
-    // 파티의 도착지 좌표로 중심을 설정
-    final centerLat = party!.destLat;
-    final centerLng = party!.destLng;
-    final html = raw
-        .replaceAll('{{KAKAO_JS_KEY}}', kakaoKey)
-        .replaceAll('{{CENTER_LAT}}', centerLat.toString())
-        .replaceAll('{{CENTER_LNG}}', centerLng.toString());
-
-    final wc = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0x00000000))
-      ..addJavaScriptChannel(
-        'MarkerClick',
-        onMessageReceived: (msg) {
-          // 필요하다면 마커 클릭 시 로직 추가
-        },
-      )
-      ..setNavigationDelegate(
-        NavigationDelegate(onPageFinished: (_) {
-          setState(() {
-            _mapLoaded = true;
-          });
-          _renderMarkers();
-        }),
-      )
-      ..loadHtmlString(html, baseUrl: 'about:blank');
-
-    setState(() {
-      _mapController = wc;
-    });
-  }
-
-  /// 출발지(origin)와 도착지(destination)에 마커를 추가합니다.
-  void _renderMarkers() {
-    if (_mapController == null || party == null) return;
-
-    final oLat = party!.originLat;
-    final oLng = party!.originLng;
-    final dLat = party!.destLat;
-    final dLng = party!.destLng;
-
-    final jsOrigin = '''
-      addMarker("origin", $oLat, $oLng, "출발지", "blue");
-    ''';
-    final jsDest = '''
-      addMarker("destination", $dLat, $dLng, "도착지", "red");
-    ''';
-
-    _mapController!.runJavaScript(jsOrigin);
-    _mapController!.runJavaScript(jsDest);
-  }
-
-  void _showFareSettingDialog() {
-    if (party == null) return;
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('정산 페이지로 이동'),
-        content: const Text('파티원이 다 차면 정산 페이지로 이동하시겠습니까?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('나중에'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => FareSettingScreen(
-                    partyId: party!.partyId.toString(),
-                    members: party!.members,
-                    stopovers: party!.stopovers,
-                  ),
-                ),
-              );
-            },
-            child: const Text('이동'),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -260,20 +149,6 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ─── 지도 영역 ───────────────────────────────────────────
-            Container(
-              height: 240,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                color: Colors.grey[200],
-              ),
-              clipBehavior: Clip.hardEdge,
-              child: _mapController == null
-                  ? const Center(child: CircularProgressIndicator())
-                  : WebViewWidget(controller: _mapController!),
-            ),
-            const SizedBox(height: 16),
-
             // ─── 최대 인원 / 팟 옵션 ───────────────────────────────────
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -339,34 +214,6 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
                 ),
               );
             }).toList(),
-
-            const SizedBox(height: 24),
-
-            // 정산 페이지로 이동 버튼
-            if (party!.members.length >= party!.maxPerson)
-              Center(
-                child: ElevatedButton.icon(
-                  icon: const Icon(Icons.payment),
-                  label: const Text('정산 페이지로 이동'),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => FareSettingScreen(
-                          partyId: party!.partyId.toString(),
-                          members: party!.members,
-                          stopovers: party!.stopovers,
-                        ),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
       ),

@@ -12,9 +12,7 @@ import 'package:app2_client/providers/auth_provider.dart';
 import 'package:app2_client/services/socket_service.dart';
 import 'package:app2_client/services/party_service.dart';
 import 'package:app2_client/models/join_request_model.dart';
-import 'package:app2_client/screens/stopover_setting_screen.dart';
 import 'package:app2_client/screens/chat_room_screen.dart';
-import 'package:app2_client/screens/fare_setting_screen.dart';
 
 class MyPartyScreen extends StatefulWidget {
   final PartyDetail party;
@@ -175,35 +173,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
   }
 
   void _showFareSettingDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('정산 페이지로 이동'),
-        content: const Text('모든 파티원이 모였습니다. 정산 페이지로 이동하시겠습니까?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('나중에'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => FareSettingScreen(
-                    partyId: _party.partyId.toString(),
-                    members: _party.members,
-                    stopovers: [],
-                  ),
-                ),
-              );
-            },
-            child: const Text('이동'),
-          ),
-        ],
-      ),
-    );
+    // FareSettingScreen 관련 코드(네비게이션, builder, 버튼 등) 전체 삭제
   }
 
   Future<void> _updatePartyDetail() async {
@@ -328,15 +298,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                   icon: const Icon(Icons.payment),
                   label: const Text('정산 페이지로 이동'),
                   onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => FareSettingScreen(
-                          partyId: _party.partyId.toString(),
-                          members: _party.members,
-                          stopovers: [],
-                        ),
-                      ),
-                    );
+                    // FareSettingScreen 관련 코드(네비게이션, builder, 버튼 등) 전체 삭제
                   },
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
