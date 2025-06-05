@@ -60,8 +60,8 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
     // WebView(파티 지도) 초기화
     _initMapWebView();
 
-    // 파티원이 3명이면 정산 페이지로 이동
-    if (_party.members.length >= 3) {
+    // 파티원이 다 차면 정산 페이지로 이동
+    if (_party.members.length >= _party.maxPerson) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _showFareSettingDialog();
       });
@@ -539,7 +539,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('정산 페이지로 이동'),
-        content: const Text('파티원이 3명이 되었습니다. 정산 페이지로 이동하시겠습니까?'),
+        content: const Text('파티원이 다 차면 정산 페이지로 이동하시겠습니까?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -721,7 +721,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                   const SizedBox(height: 24),
 
                   // 정산 페이지로 이동 버튼
-                  if (_party.members.length >= 3)
+                  if (_party.members.length >= _party.maxPerson)
                     Center(
                       child: ElevatedButton.icon(
                         icon: const Icon(Icons.payment),

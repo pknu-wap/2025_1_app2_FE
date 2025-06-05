@@ -125,8 +125,8 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
         _loading = false;
       });
 
-      // 파티원이 3명이면 정산 페이지로 이동
-      if (party != null && party!.members.length >= 3) {
+      // 파티원이 다 차면 정산 페이지로 이동
+      if (party != null && party!.members.length >= party!.maxPerson) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _showFareSettingDialog();
         });
@@ -210,7 +210,7 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('정산 페이지로 이동'),
-        content: const Text('파티원이 3명이 되었습니다. 정산 페이지로 이동하시겠습니까?'),
+        content: const Text('파티원이 다 차면 정산 페이지로 이동하시겠습니까?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -343,7 +343,7 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
             const SizedBox(height: 24),
 
             // 정산 페이지로 이동 버튼
-            if (party!.members.length >= 3)
+            if (party!.members.length >= party!.maxPerson)
               Center(
                 child: ElevatedButton.icon(
                   icon: const Icon(Icons.payment),
