@@ -20,30 +20,10 @@ class SmsCertificationScreen extends StatefulWidget {
   State<SmsCertificationScreen> createState() => _SmsCertificationScreenState();
 }
 
-class _SmsCertificationScreenState extends State<SmsCertificationScreen> with WidgetsBindingObserver {
+class _SmsCertificationScreenState extends State<SmsCertificationScreen> {
   final AuthService _authService = AuthService();
   bool isVerifying = false;
-  SmsSessionModel? _session = null;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
-    WidgetsBinding.instance.removeObserver(this);
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) async {
-    // 앱이 포그라운드로 돌아왔을 때
-    if (state == AppLifecycleState.resumed) {
-      verifySms();
-    }
-  }
+  SmsSessionModel? _session;
 
   @override
   Widget build(BuildContext context) {
@@ -90,7 +70,7 @@ class _SmsCertificationScreenState extends State<SmsCertificationScreen> with Wi
               width: double.infinity,
               height: 54,
               child: ElevatedButton(
-                onPressed: () async {
+                onPressed: isVerifying ? null : () async {
                   await showSms();
                   await verifySms();
                 },
@@ -99,13 +79,14 @@ class _SmsCertificationScreenState extends State<SmsCertificationScreen> with Wi
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
+                  disabledBackgroundColor: Colors.grey[400],
                 ),
-                child: const Text(
-                  '인증 메시지 보내기',
+                child: Text(
+                  isVerifying ? '인증 중...' : '인증 메시지 보내기',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w600,
-                    color: Colors.white
+                    color: isVerifying ? Colors.grey[600] : Colors.white
                   ),
                 ),
               ),
@@ -135,7 +116,7 @@ class _SmsCertificationScreenState extends State<SmsCertificationScreen> with Wi
       print(error);
       return '';
     });
-    if (result != 'sent') {
+    if (result != 'sent' && result != 'SMS Sent!') {
       isVerifying = false;
       return;
     }

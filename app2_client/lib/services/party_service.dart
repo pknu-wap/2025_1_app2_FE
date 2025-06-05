@@ -109,10 +109,10 @@ class PartyService {
         options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
       );
       if (response.statusCode != 200) {
-        throw Exception('파티 참여 실패: \\${response.data}');
+        throw Exception('파티 참여 실패: ${response.data}');
       }
-    } on DioException catch (e) {
-      throw e;
+    } on DioError catch (e) {
+      throw Exception('파티 참여 실패: ${e.response?.data ?? e.message}');
     } catch (e) {
       throw Exception('파티 참여 실패: $e');
     }
@@ -202,7 +202,7 @@ class PartyService {
     return PartyDetail.fromJson(response.data as Map<String, dynamic>);
   }
 
-  /// 경유지 추가 (POST /api/party/{id})
+  /// 경유지 추가 (POST /api/party/{partyId})
   static Future<List<StopoverResponse>> addStopover({
     required String partyId,
     required String memberEmail,
@@ -228,7 +228,7 @@ class PartyService {
         .toList();
   }
 
-  /// 경유지 수정 (PATCH /api/party/{id})
+  /// 경유지 수정 (PATCH /api/party/{partyId})
   static Future<List<StopoverResponse>> updateStopover({
     required String partyId,
     required int stopoverId,
@@ -280,7 +280,13 @@ class PartyService {
         .toList();
   }
 
-  /// 요금 입력
+  // ──────────────────────────────────────────────────────────────────────────────
+  // ↓↓ 여기에 두 브랜치의 “요금 관련” 메서드를 모두 병합했습니다. ↓↓
+  // ──────────────────────────────────────────────────────────────────────────────
+
+  /// (1) 요금 입력: 여러 경유지에 대한 요금을 일괄로 보내고, 서버에서 계산된 PaymentInfo 리스트를 반환받음
+  ///   - POST /api/party/{partyId}/fare
+  ///   - [fareRequests] : List<FareRequest> (각 경유지별 id와 요금)
   static Future<List<PaymentInfo>> submitFare({
     required String partyId,
     required List<FareRequest> fareRequests,
@@ -305,7 +311,9 @@ class PartyService {
     }
   }
 
-  /// 요금 확인
+  /// (2) 요금 확인: 사용자가 이미 제출한 요금 내역을 확인
+  ///   - PATCH /api/party/{partyId}/fare/confirm
+  ///   - [confirm] : FareConfirm 객체 (꼭 필요한 필드만 채워서 보냄)
   static Future<List<PaymentInfo>> confirmFare({
     required String partyId,
     required FareConfirm confirm,
@@ -330,7 +338,8 @@ class PartyService {
     }
   }
 
-  /// 최종 요금 조회
+  /// (3) 최종 요금 조회: 모든 경유지에서 확정된 최종 요금 리스트를 가져옴
+  ///   - GET /api/party/{partyId}/final-fare
   static Future<List<PaymentInfo>> getFinalFare({
     required String partyId,
     required String accessToken,
@@ -352,4 +361,78 @@ class PartyService {
       throw Exception('최종 요금 조회 실패: $e');
     }
   }
+
+  /// (4) 단일 경유지 요금 입력: 간단히 stopoverId, fare만 보내고 void를 반환
+  ///   ※ “여러 경유지 요금을 한 번에 전송” 메서드 말고, 단일 경유지별로 보내고 싶을 때 사용
+  ///   - POST /api/party/{partyId}/fare/single
+  static Future<void> submitSingleFare({
+    required String partyId,
+    required int stopoverId,
+    required int fare,
+    required String accessToken,
+  }) async {
+    final url = "${ApiConstants.partyEndpoint}/$partyId/fare/single";
+    final body = {
+      "stopover_id": stopoverId,
+      "fare": fare,
+    };
+    
+    final response = await DioClient.dio.post(
+      url,
+      data: body,
+      options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+    );
+    
+    if (response.statusCode != 200) {
+      throw Exception('단일 경유지 요금 입력 실패: ${response.statusCode}');
+    }
+  }
+
+  /// (5) 요금 승인: 호스트가 특정 경유지에 대해 요금을 승인
+  ///   - POST /api/party/{partyId}/fare/approve
+  static Future<void> approveFare({
+    required String partyId,
+    required int stopoverId,
+    required String accessToken,
+  }) async {
+    final url = "${ApiConstants.partyEndpoint}/$partyId/fare/approve";
+    final body = {
+      "stopover_id": stopoverId,
+    };
+    
+    final response = await DioClient.dio.post(
+      url,
+      data: body,
+      options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+    );
+    
+    if (response.statusCode != 200) {
+      throw Exception('요금 승인 실패: ${response.statusCode}');
+    }
+  }
+
+  /// (6) 요금 거절: 호스트가 특정 경유지에 대해 요금을 거절
+  ///   - POST /api/party/{partyId}/fare/reject
+  static Future<void> rejectFare({
+    required String partyId,
+    required int stopoverId,
+    required String accessToken,
+  }) async {
+    final url = "${ApiConstants.partyEndpoint}/$partyId/fare/reject";
+    final body = {
+      "stopover_id": stopoverId,
+    };
+    
+    final response = await DioClient.dio.post(
+      url,
+      data: body,
+      options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+    );
+    
+    if (response.statusCode != 200) {
+      throw Exception('요금 거절 실패: ${response.statusCode}');
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────────
 }

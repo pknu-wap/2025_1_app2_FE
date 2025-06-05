@@ -25,7 +25,9 @@ Future<void> main() async {
     OverlaySupport.global(
       child: ChangeNotifierProvider.value(
         value: authProvider,
-        child: const MyApp(),
+        child: Platform.isAndroid
+          ? SafeArea(child: const MyApp())
+          : const MyApp(),
       ),
     ),
   );
