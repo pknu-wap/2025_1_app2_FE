@@ -139,22 +139,10 @@ class _TaxiFarePageState extends State<TaxiFarePage> {
     final groupNumber = widget.stopoverList.indexWhere((s) => s.stopover.id == stopoverId) + 1;
     if (groupNumber == 0) return;
 
-    if (eventType == 'FARE_INPUT') {
-      final fare = msg['fare'] as int?;
-      if (fare != null) {
-        setState(() {
-          fareInputs[groupNumber] = fare.toString();
-        });
-      }
-    } else if (eventType == 'FARE_APPROVAL') {
-      final memberName = msg['member_name'] as String?;
-      if (memberName != null) {
-        setState(() {
-          if (!approvals[groupNumber]!.contains(memberName)) {
-            approvals[groupNumber]!.add(memberName);
-          }
-        });
-      }
+    if (eventType == 'PARTY_UPDATE') {
+      setState(() {
+        _initializeData();
+      });
     }
   }
 
