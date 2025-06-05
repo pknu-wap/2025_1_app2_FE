@@ -8,6 +8,7 @@ import 'package:app2_client/services/party_service.dart';
 import 'package:app2_client/services/socket_service.dart';
 import 'package:app2_client/providers/auth_provider.dart';
 import 'package:app2_client/screens/attendee_party_screen.dart';
+import 'package:app2_client/models/party_option.dart';
 
 class PartyJoinModal extends StatefulWidget {
   final PartyModel pot;
@@ -115,14 +116,14 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
 
     // partyOption 필터링 로직 추가
     final userGender = Provider.of<AuthProvider>(context, listen: false).userGender; // 사용자 성별 정보 가져오기
-    if (widget.pot.partyOption == 'ONLY_MALE' && userGender != 'MALE') {
+    if (widget.pot.partyOption == PartyOption.onlyMale && userGender != 'MALE') {
       setState(() {
         _isRequesting = false;
         _errorMessage = '남성만 참여 가능한 파티입니다.';
       });
       return;
     }
-    if (widget.pot.partyOption == 'ONLY_FEMALE' && userGender != 'FEMALE') {
+    if (widget.pot.partyOption == PartyOption.onlyFemale && userGender != 'FEMALE') {
       setState(() {
         _isRequesting = false;
         _errorMessage = '여성만 참여 가능한 파티입니다.';

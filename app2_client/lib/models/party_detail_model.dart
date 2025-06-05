@@ -2,6 +2,7 @@
 
 import 'package:app2_client/models/party_member_model.dart';
 import 'package:app2_client/models/stopover_model.dart';
+import 'package:app2_client/models/party_option.dart';
 
 class PartyDetail {
   final int partyId;
@@ -13,7 +14,7 @@ class PartyDetail {
   final double destLng;       // 도착지 경도  ← 새로 추가
   final double radius;
   final int maxPerson;
-  final String partyOption;
+  final PartyOption partyOption;
   final List<PartyMember> members;
   final List<StopoverResponse> stopovers;
 
@@ -65,7 +66,7 @@ class PartyDetail {
       destLng: destLng,       // 추가된 필드
       radius: (json['party_radius'] as num).toDouble(),
       maxPerson: json['party_max_people'] as int,
-      partyOption: json['party_option'] as String,
+      partyOption: PartyOption.fromString(json['party_option'] as String),
       members: memberList,
       stopovers: stopoverList,
     );

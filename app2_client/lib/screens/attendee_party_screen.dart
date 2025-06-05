@@ -303,7 +303,7 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      party!.partyOption,
+                      party!.partyOption.label,
                       style: const TextStyle(fontSize: 14),
                     ),
                   ],

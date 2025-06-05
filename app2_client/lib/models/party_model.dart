@@ -1,5 +1,7 @@
 // lib/models/party_model.dart
 
+import 'package:app2_client/models/party_option.dart';
+
 class PartyModel {
   final String id;
   final String creatorName;
@@ -11,6 +13,7 @@ class PartyModel {
   final double originLng;
   final double destLat;
   final double destLng;
+  final PartyOption partyOption;
 
   PartyModel({
     required this.id,
@@ -23,6 +26,7 @@ class PartyModel {
     required this.originLng,
     required this.destLat,
     required this.destLng,
+    required this.partyOption,
   });
 
   factory PartyModel.fromJson(Map<String, dynamic> json) {
@@ -46,6 +50,7 @@ class PartyModel {
       originLng: start != null ? (start['location']['lng'] as num).toDouble() : 0.0,
       destLat: dest != null ? (dest['location']['lat'] as num).toDouble() : 0.0,
       destLng: dest != null ? (dest['location']['lng'] as num).toDouble() : 0.0,
+      partyOption: PartyOption.fromString(json['party_option'] as String),
     );
   }
 
@@ -60,5 +65,6 @@ class PartyModel {
     'originLng': originLng,
     'destLat': destLat,
     'destLng': destLng,
+    'partyOption': partyOption.toString(),
   };
 }

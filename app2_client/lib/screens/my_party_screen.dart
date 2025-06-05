@@ -60,11 +60,22 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
     // WebView(파티 지도) 초기화
     _initMapWebView();
 
-    // 파티원이 다 차면 정산 페이지로 이동
+    // 파티원이 다 차고 모든 경유지가 설정되었을 때만 정산 페이지로 이동
     if (_party.members.length >= _party.maxPerson) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _showFareSettingDialog();
+      // 모든 파티원의 경유지가 설정되었는지 확인
+      final allStopoversSet = _party.members.every((member) {
+        return _party.stopovers.any((stopover) => 
+          stopover.partyMembers.any((stopoverMember) => 
+            stopoverMember.id == member.id
+          )
+        );
       });
+
+      if (allStopoversSet) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showFareSettingDialog();
+        });
+      }
     }
   }
 
@@ -563,6 +574,38 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _updatePartyDetail() async {
+    final token = Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
+    if (token == null) return;
+
+    try {
+      final refreshed = await PartyService.fetchPartyDetailById(_party.partyId.toString());
+      setState(() {
+        _party = refreshed;
+      });
+
+      // 파티원이 다 차고 모든 경유지가 설정되었을 때만 정산 페이지로 이동
+      if (_party.members.length >= _party.maxPerson) {
+        // 모든 파티원의 경유지가 설정되었는지 확인
+        final allStopoversSet = _party.members.every((member) {
+          return _party.stopovers.any((stopover) => 
+            stopover.partyMembers.any((stopoverMember) => 
+              stopoverMember.id == member.id
+            )
+          );
+        });
+
+        if (allStopoversSet) {
+          _showFareSettingDialog();
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('파티 정보 업데이트 실패: $e')),
+      );
+    }
   }
 
   @override
