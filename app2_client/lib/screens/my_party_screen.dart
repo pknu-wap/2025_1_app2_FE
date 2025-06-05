@@ -9,15 +9,15 @@ import 'package:provider/provider.dart';
 
 import 'package:app2_client/models/party_detail_model.dart';
 import 'package:app2_client/models/stopover_model.dart';
-import 'package:app2_client/models/join_request_model.dart';
+import 'package:app2_client/models/location_model.dart';
+import 'package:app2_client/models/party_member_model.dart';
 import 'package:app2_client/providers/auth_provider.dart';
 import 'package:app2_client/services/socket_service.dart';
 import 'package:app2_client/services/party_service.dart';
+import 'package:app2_client/models/join_request_model.dart';
 import 'package:app2_client/screens/stopover_setting_screen.dart';
 import 'package:app2_client/screens/chat_room_screen.dart';
-
-import '../models/location_model.dart';
-import '../models/party_member_model.dart';
+import 'package:app2_client/screens/fare_setting_screen.dart';
 
 class MyPartyScreen extends StatefulWidget {
   final PartyDetail party;
@@ -40,11 +40,14 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
   final TextEditingController _descController = TextEditingController();
   List<JoinRequest> _joinRequests = [];
 
+  // ★ WebViewController 및 로드 여부 플래그
   WebViewController? _mapController;
   bool _mapLoaded = false;
-  bool _subscribed = false;
 
+  // 로컬에 보관할 StopoverResponse 리스트
   List<StopoverResponse> _stopoverList = [];
+
+  bool _socketConnected = false;
 
   @override
   void initState() {
@@ -53,45 +56,67 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
     _desc = widget.description ?? '';
     _descController.text = _desc!;
     _connectAndSubscribe();
+
+    // WebView(파티 지도) 초기화
     _initMapWebView();
+
+    // 파티원이 3명이면 정산 페이지로 이동
+    if (_party.members.length >= 3) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showFareSettingDialog();
+      });
+    }
   }
 
-  @override
-  void dispose() {
-    _descController.dispose();
-    SocketService.disconnect();
-    super.dispose();
-  }
-
-  /// STOMP 연결 및 호스트 전용 구독
+  /// STOMP 연결 및 호스트 전용 구독 (참여 요청 응답 채널 + 파티 내부 업데이트)
   void _connectAndSubscribe() {
     final token =
         Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
     if (token == null) return;
 
-    void _doSubscribe() {
-      if (_subscribed) return;
-
-      // ─── 참여 요청 응답 구독 (호스트 전용) ────────────────────────────────
+    SocketService.connect(token, onConnect: () {
+      setState(() {
+        _socketConnected = true;
+      });
       SocketService.subscribeJoinRequestResponse(onMessage: (msg) {
-        final incomingPartyId = msg['partyId']?.toString();
-        final status = msg['status'] as String? ?? '';
-        if (incomingPartyId == _party.partyId.toString() && status == 'PENDING') {
+        print('🔔 호스트용 참여 요청 메시지 수신: $msg');
+        if (msg['status'] == 'PENDING') {
           try {
             final joinRequest = JoinRequest.fromJson(msg);
+            print('✅ JoinRequest 파싱 성공: ${joinRequest.requesterEmail}');
             setState(() {
               _joinRequests.add(joinRequest);
+              print('✅ _joinRequests 길이: ${_joinRequests.length}');
             });
           } catch (e) {
-            debugPrint('❌ JoinRequest 파싱 실패: $e');
+            print('❌ JoinRequest 파싱 실패: $e');
+            print('❌ 메시지 내용: $msg');
           }
+        } else {
+          print('⚠️ status가 PENDING이 아님: ${msg['status']}');
         }
       });
 
-      // ─── 파티 멤버 업데이트 구독 ───────────────────────────────────────
+      // ★ 추가: 호스트용 참여 요청 구독
+      SocketService.subscribeJoinRequests(onMessage: (msg) {
+        print('🔔 [join-requests] 호스트용 참여 요청 수신: $msg');
+        try {
+          final joinRequest = JoinRequest.fromJson(msg);
+          print('✅ [join-requests] JoinRequest 파싱 성공: ${joinRequest.requesterEmail}');
+          setState(() {
+            _joinRequests.add(joinRequest);
+            print('✅ [join-requests] _joinRequests 길이: ${_joinRequests.length}');
+          });
+        } catch (e) {
+          print('❌ [join-requests] JoinRequest 파싱 실패: $e');
+          print('❌ [join-requests] 메시지 내용: $msg');
+        }
+      });
+
       SocketService.subscribePartyMembers(
         partyId: _party.partyId,
         onMessage: (msg) async {
+          print('🔔 파티 멤버 업데이트 메시지 수신: $msg');
           final eventType = msg['eventType'];
           if (eventType == 'MEMBER_JOIN' || eventType == 'PARTY_UPDATE') {
             final updated = await PartyService.fetchPartyDetailById(
@@ -99,32 +124,41 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
             );
             setState(() {
               _party = updated;
+              // 만약 서버가 StopoverResponse를 내려준다면 여기서 _stopoverList도 업데이트
+              // 예: _stopoverList = updated.stopovers;
             });
             _refreshAllMarkers();
           }
         },
       );
-
-      _subscribed = true;
-      debugPrint('✅ 소켓 구독 완료 - 파티 ID: ${_party.partyId}');
-    }
-
-    // 1) STOMP 연결 시도 → onConnect에서 _doSubscribe() 호출
-    SocketService.connect(token, onConnect: () {
-      _doSubscribe();
+      print('✅ 소켓 구독 완료 - 파티 ID: ${_party.partyId}');
     });
-
-    // 2) 이미 연결된 상태라면(onConnect이 불릴 수 없으므로) 즉시 구독
-    if (SocketService.connected) {
-      _doSubscribe();
-    }
   }
 
-  /// WebViewController 생성 & kakao_party_map.html 로드
+  @override
+  void dispose() {
+    _descController.dispose();
+    SocketService.disconnect();
+    _socketConnected = false;
+    super.dispose();
+  }
+
+  void _saveDesc() {
+    setState(() {
+      _desc = _descController.text.trim();
+      _editingDesc = false;
+    });
+  }
+
+  /// WebViewController를 생성 & kakao_party_map.html 로드
   Future<void> _initMapWebView() async {
+    // 1) assets 폴더에 kakao_party_map.html 이 반드시 있어야 합니다.
     final rawHtml = await rootBundle.loadString('assets/kakao_party_map.html');
+
     final centerLat = _party.destLat;
     final centerLng = _party.destLng;
+
+    // .env에서 카카오 JS 키를 불러와 치환
     final kakaoKey = dotenv.env['KAKAO_JS_KEY'] ?? '';
     final htmlWithParams = rawHtml
         .replaceAll('{{KAKAO_JS_KEY}}', kakaoKey)
@@ -133,9 +167,11 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
 
     final controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.transparent)
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageFinished: (_) {
+            // HTML이 완전히 로드된 직후에 true로 바꿔 주고 마커 찍기
             setState(() {
               _mapLoaded = true;
             });
@@ -150,27 +186,27 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
     });
   }
 
-  /// 목적지 + 경유지 전체 마커 갱신
+  /// 목적지 + 경유지 전체 마커를 갱신
   Future<void> _refreshAllMarkers() async {
     if (!_mapLoaded || _mapController == null) return;
 
     try {
-      // 1) 기존 마커 제거
+      // 1) 기존 마커 모두 제거
       for (final stop in _stopoverList) {
         await _mapController!
             .runJavaScript('removeMarker("${stop.stopover.id}");');
       }
-      // Host 도착지(빨간색) 마커 제거
+      // 목적지(Host dest)는 ID를 "destination" 으로 고정
       await _mapController!.runJavaScript('removeMarker("destination");');
 
       // 2) Host 도착지(빨간색) 마커 찍기
       final destLat = _party.destLat;
       final destLng = _party.destLng;
       await _mapController!.runJavaScript(
-        'addMarker("destination", $destLat, $destLng, "도착지", "red");',
+        'addMarker("destination", $destLat, $destLng, "목적지", "red");',
       );
 
-      // 3) 경유지(초록색) 마커 찍기
+      // 3) 각 경유지(초록색) 마커 찍기
       for (final stop in _stopoverList) {
         final id = stop.stopover.id.toString();
         final lat = stop.stopover.location.lat;
@@ -185,15 +221,6 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
     }
   }
 
-  /// 설명 저장
-  void _saveDesc() {
-    setState(() {
-      _desc = _descController.text.trim();
-      _editingDesc = false;
-    });
-  }
-
-  /// 참여 요청 수락
   Future<void> _acceptRequest(int requestId) async {
     final token =
         Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
@@ -207,14 +234,13 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
       setState(() {
         _joinRequests.removeWhere((r) => r.requestId == requestId);
       });
-      // MEMBER_JOIN 브로드캐스트를 받아 자동 갱신됨
+      // MemberJoin 이벤트가 들어오면 자동으로 멤버 리스트 갱신됨
     } catch (e) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('수락 실패: $e')));
     }
   }
 
-  /// 참여 요청 거절
   Future<void> _rejectRequest(int requestId) async {
     final token =
         Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
@@ -234,14 +260,13 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
     }
   }
 
-  /// 경유지 추가 다이얼로그
+  /// "경유지 추가" 다이얼로그 띄우고, 파티에 경유지 추가 요청 후 로컬 리스트와 마커 갱신, 추가된 경유지 설정 화면으로 이동
   Future<void> _addStopoverDialog() async {
     final token =
         Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
     if (token == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('로그인이 필요합니다.')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('로그인이 필요합니다.')));
       return;
     }
 
@@ -319,6 +344,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                 }
 
                 try {
+                  // 백엔드로 경유지 추가 요청
                   final List<StopoverResponse> newList =
                   await PartyService.addStopover(
                     partyId: _party.partyId.toString(),
@@ -328,10 +354,12 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                     accessToken: token,
                   );
 
+                  // 로컬 리스트 갱신 + 마커 다시 찍기
                   setState(() {
                     _stopoverList = newList;
                   });
 
+                  // 새로 추가된 경유지가 있으면 → "하차 지점 설정 화면"으로 바로 이동
                   if (newList.isNotEmpty) {
                     final added = newList.firstWhere(
                             (e) =>
@@ -339,8 +367,9 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                             e.partyMembers.any((m) => m.email == email),
                         orElse: () => newList.first);
 
-                    Navigator.of(context).pop();
+                    Navigator.of(context).pop(); // 다이얼로그 닫기
 
+                    // 경유지 설정 화면으로 이동
                     Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) => StopoverSettingScreen(
@@ -357,6 +386,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                   );
                 }
 
+                // 다이얼로그 닫고, 지도 마커 다시 그리기
                 Navigator.of(context).pop();
                 _refreshAllMarkers();
               },
@@ -367,7 +397,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
     );
   }
 
-  /// 경유지 수정 다이얼로그
+  /// "경유지 수정" 다이얼로그 (MyPartyScreen 내에서도 호출 가능)
   Future<void> _updateStopoverDialog(StopoverResponse existing) async {
     final token =
         Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
@@ -461,7 +491,6 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
     );
   }
 
-  /// 정산자 지정 다이얼로그
   Future<void> _designateBookkeeperDialog(PartyMember member) async {
     final token =
         Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
@@ -505,6 +534,37 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
     );
   }
 
+  void _showFareSettingDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('정산 페이지로 이동'),
+        content: const Text('파티원이 3명이 되었습니다. 정산 페이지로 이동하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('나중에'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => FareSettingScreen(
+                    partyId: _party.partyId.toString(),
+                    members: _party.members,
+                    stopovers: _stopoverList,
+                  ),
+                ),
+              );
+            },
+            child: const Text('이동'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -542,8 +602,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.check,
-                            color: Colors.green),
+                        icon: const Icon(Icons.check, color: Colors.green),
                         onPressed: _saveDesc,
                       ),
                     ],
@@ -558,8 +617,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                       ),
                       IconButton(
                         icon: const Icon(Icons.edit, size: 20),
-                        onPressed: () =>
-                            setState(() => _editingDesc = true),
+                        onPressed: () => setState(() => _editingDesc = true),
                       ),
                     ],
                   ),
@@ -578,7 +636,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
 
                   const SizedBox(height: 24),
 
-                  // 경유지 추가 버튼
+                  // "경유지 추가" 버튼
                   Center(
                     child: ElevatedButton.icon(
                       icon: const Icon(Icons.add_road),
@@ -612,6 +670,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                           },
                         ),
                         onTap: () {
+                          // 해당 경유지 설정 화면으로 이동
                           Navigator.of(context).push(
                             MaterialPageRoute(
                               builder: (_) => StopoverSettingScreen(
@@ -627,7 +686,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                     const Divider(),
                   ],
 
-                  // 파티원 목록 & 정산자 지정 버튼
+                  // **파티원 목록 & 정산자 지정 버튼**
                   const Text('파티원 목록',
                       style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
@@ -635,7 +694,6 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                     final isBookkeeper =
                         m.role == 'BOOKKEEPER' || m.additionalRole == 'BOOKKEEPER';
                     return Card(
-                      margin: const EdgeInsets.symmetric(vertical: 6),
                       child: ListTile(
                         leading: Icon(
                           m.gender == 'FEMALE' ? Icons.female : Icons.male,
@@ -662,7 +720,33 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
 
                   const SizedBox(height: 24),
 
-                  // ─── 오직 “내 파티 ID”로 온 요청만 보여줌 ───────────────────────────
+                  // 정산 페이지로 이동 버튼
+                  if (_party.members.length >= 3)
+                    Center(
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.payment),
+                        label: const Text('정산 페이지로 이동'),
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => FareSettingScreen(
+                                partyId: _party.partyId.toString(),
+                                members: _party.members,
+                                stopovers: _stopoverList,
+                              ),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // **참여 요청 리스트**
                   if (_joinRequests.isNotEmpty) ...[
                     const Divider(),
                     const SizedBox(height: 8),
@@ -672,7 +756,6 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                     ..._joinRequests.map((req) {
                       return Card(
                         color: Colors.amber[50],
-                        margin: const EdgeInsets.symmetric(vertical: 6),
                         child: ListTile(
                           title: Text(req.requesterEmail),
                           subtitle: Text('요청 ID: ${req.requestId}'),
@@ -686,8 +769,8 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                                     _acceptRequest(req.requestId),
                               ),
                               IconButton(
-                                icon: const Icon(Icons.close,
-                                    color: Colors.red),
+                                icon:
+                                const Icon(Icons.close, color: Colors.red),
                                 onPressed: () =>
                                     _rejectRequest(req.requestId),
                               ),
@@ -699,7 +782,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                     const SizedBox(height: 16),
                   ],
 
-                  // 디버그 정보
+                  // 디버그: 현재 _joinRequests 상태 표시
                   const Divider(),
                   Container(
                     padding: const EdgeInsets.all(8),
@@ -710,12 +793,13 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('🔧 디버그 정보',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blue)),
+                        Text('🔧 디버그 정보', 
+                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
                         Text('참여 요청 개수: ${_joinRequests.length}'),
                         Text('파티 ID: ${_party.partyId}'),
+                        Text('소켓 연결 상태: ${_socketConnected ? "연결됨" : "끊김"}'),
+                        if (_joinRequests.isNotEmpty) 
+                          Text('요청자들: ${_joinRequests.map((r) => r.requesterEmail).join(", ")}'),
                       ],
                     ),
                   ),
@@ -730,8 +814,9 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) =>
-                  ChatRoomScreen(roomId: _party.partyId.toString()),
+              builder: (context) => ChatRoomScreen(
+                roomId: widget.party.partyId.toString(),
+              ),
             ),
           );
         },

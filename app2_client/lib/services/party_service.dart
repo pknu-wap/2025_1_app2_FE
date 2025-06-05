@@ -12,6 +12,9 @@ import 'package:app2_client/services/socket_service.dart';
 import 'dart:convert';
 
 import '../models/party_member_model.dart';
+import '../models/payment_info_model.dart';
+import '../models/fare_request_model.dart';
+import '../models/fare_confirm_model.dart';
 
 class PartyService {
   /// 주변 팟 조회 (Authorization 헤더 추가)
@@ -275,5 +278,78 @@ class PartyService {
     return arr
         .map((e) => PartyMember.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  /// 요금 입력
+  static Future<List<PaymentInfo>> submitFare({
+    required String partyId,
+    required List<FareRequest> fareRequests,
+    required String accessToken,
+  }) async {
+    final url = "${ApiConstants.partyEndpoint}/$partyId/fare";
+    try {
+      final response = await DioClient.dio.post(
+        url,
+        data: fareRequests.map((req) => req.toJson()).toList(),
+        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+      );
+      
+      if (response.statusCode != 200) {
+        throw Exception('요금 입력 실패: ${response.data}');
+      }
+
+      final List<dynamic> jsonList = response.data as List<dynamic>;
+      return jsonList.map((json) => PaymentInfo.fromJson(json)).toList();
+    } catch (e) {
+      throw Exception('요금 입력 실패: $e');
+    }
+  }
+
+  /// 요금 확인
+  static Future<List<PaymentInfo>> confirmFare({
+    required String partyId,
+    required FareConfirm confirm,
+    required String accessToken,
+  }) async {
+    final url = "${ApiConstants.partyEndpoint}/$partyId/fare/confirm";
+    try {
+      final response = await DioClient.dio.patch(
+        url,
+        data: confirm.toJson(),
+        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+      );
+      
+      if (response.statusCode != 200) {
+        throw Exception('요금 확인 실패: ${response.data}');
+      }
+
+      final List<dynamic> jsonList = response.data as List<dynamic>;
+      return jsonList.map((json) => PaymentInfo.fromJson(json)).toList();
+    } catch (e) {
+      throw Exception('요금 확인 실패: $e');
+    }
+  }
+
+  /// 최종 요금 조회
+  static Future<List<PaymentInfo>> getFinalFare({
+    required String partyId,
+    required String accessToken,
+  }) async {
+    final url = "${ApiConstants.partyEndpoint}/$partyId/final-fare";
+    try {
+      final response = await DioClient.dio.get(
+        url,
+        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
+      );
+      
+      if (response.statusCode != 200) {
+        throw Exception('최종 요금 조회 실패: ${response.data}');
+      }
+
+      final List<dynamic> jsonList = response.data as List<dynamic>;
+      return jsonList.map((json) => PaymentInfo.fromJson(json)).toList();
+    } catch (e) {
+      throw Exception('최종 요금 조회 실패: $e');
+    }
   }
 }
