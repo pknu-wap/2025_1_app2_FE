@@ -7,6 +7,7 @@ import 'package:app2_client/services/party_service.dart';
 import 'package:app2_client/models/party_detail_model.dart';
 import 'package:app2_client/screens/my_party_screen.dart';
 import 'package:app2_client/providers/auth_provider.dart';
+import 'package:app2_client/models/party_option.dart';
 
 class PartyCreateModal extends StatefulWidget {
   final double startLat, startLng;
@@ -31,7 +32,7 @@ class PartyCreateModal extends StatefulWidget {
 class _PartyCreateModalState extends State<PartyCreateModal> {
   double _radius = 1000; // meters
   int _maxPerson = 3;
-  String _option = 'MIXED';
+  PartyOption _option = PartyOption.mixed;
   final _descController = TextEditingController();
   bool _submitting = false;
 
@@ -193,13 +194,14 @@ class _PartyCreateModalState extends State<PartyCreateModal> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text('팟 옵션'),
-                    DropdownButton<String>(
+                    DropdownButton<PartyOption>(
                       value: _option,
-                      items: const [
-                        DropdownMenuItem(value: 'MIXED', child: Text('혼성')),
-                        DropdownMenuItem(value: 'ONLY_MALE', child: Text('남성만')),
-                        DropdownMenuItem(value: 'ONLY_FEMALE', child: Text('여성만')),
-                      ],
+                      items: PartyOption.values
+                          .map((option) => DropdownMenuItem(
+                                value: option,
+                                child: Text(option.label),
+                              ))
+                          .toList(),
                       onChanged: (v) => setState(() => _option = v!),
                     ),
                   ],

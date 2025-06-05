@@ -1,6 +1,7 @@
 // lib/models/party_detail_model.dart
 
 import 'package:app2_client/models/party_member_model.dart';
+import 'package:app2_client/models/party_option.dart';
 
 class PartyDetail {
   final int partyId;
@@ -12,7 +13,7 @@ class PartyDetail {
   final double destLng;       // 도착지 경도  ← 새로 추가
   final double radius;
   final int maxPerson;
-  final String partyOption;
+  final PartyOption partyOption;
   final List<PartyMember> members;
 
   PartyDetail({
@@ -30,7 +31,7 @@ class PartyDetail {
   });
 
   factory PartyDetail.fromJson(Map<String, dynamic> json) {
-    // JSON 구조에 따라 “party_start”와 “party_destination” 에서 address/lat/lng 를 꺼냅니다.
+    // JSON 구조에 따라 "party_start"와 "party_destination" 에서 address/lat/lng 를 꺼냅니다.
     final startLocation = json['party_start']?['location'] as Map<String, dynamic>? ?? {};
     final destLocation  = json['party_destination']?['location'] as Map<String, dynamic>? ?? {};
 
@@ -57,7 +58,7 @@ class PartyDetail {
       destLng: destLng,       // 추가된 필드
       radius: (json['party_radius'] as num).toDouble(),
       maxPerson: json['party_max_people'] as int,
-      partyOption: json['party_option'] as String,
+      partyOption: PartyOption.fromString(json['party_option'] as String),
       members: memberList,
     );
   }
