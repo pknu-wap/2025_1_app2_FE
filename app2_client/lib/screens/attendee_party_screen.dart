@@ -10,7 +10,6 @@ import 'package:app2_client/services/socket_service.dart';
 import 'package:provider/provider.dart';
 import 'package:app2_client/providers/auth_provider.dart';
 import 'package:app2_client/screens/chat_room_screen.dart';
-import 'package:app2_client/screens/fare_setting_screen.dart';
 
 class AttendeePartyScreen extends StatefulWidget {
   final String partyId;
@@ -76,7 +75,7 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
         final status = msg['status'] as String? ?? '';
         final requesterEmail = msg['requesterEmail'] as String? ?? '';
 
-        // "내 요청"인지, "내가 보고 있는 파티"인지 확인
+        // “내 요청”인지, “내가 보고 있는 파티”인지 확인
         if (incomingPartyId == widget.partyId &&
             requesterEmail == _currentUserEmail) {
           if (status == 'PENDING') {
@@ -115,31 +114,26 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
 
   /// PartyDetail을 서버에서 조회하고, 화면-지도 초기화
   Future<void> _fetchParty() async {
+    setState(() => _loading = true);
     try {
-      final token = Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
-      if (token == null) return;
-
-      final fetchedParty = await PartyService.fetchPartyDetailById(widget.partyId);
-      setState(() {
-        party = fetchedParty;
-        _loading = false;
-      });
-
-      // 파티원이 다 차면 정산 페이지로 이동
-      if (party != null && party!.members.length >= party!.maxPerson) {
+      final fetched = await PartyService.fetchPartyDetailById(widget.partyId);
+      if (mounted) {
+        setState(() {
+          party = fetched;
+        });
+        // 화면이 렌더링된 이후에 지도(WebView)를 초기화
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          _showFareSettingDialog();
+          _initMapWebView();
         });
       }
     } catch (e) {
-      setState(() {
-        _loading = false;
-      });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('파티 정보 조회 실패: $e')),
+          SnackBar(content: Text('파티 정보를 불러올 수 없습니다: $e')),
         );
       }
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -203,50 +197,11 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
     _mapController!.runJavaScript(jsDest);
   }
 
-  void _showFareSettingDialog() {
-    if (party == null) return;
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('정산 페이지로 이동'),
-        content: const Text('파티원이 다 차면 정산 페이지로 이동하시겠습니까?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('나중에'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => FareSettingScreen(
-                    partyId: party!.partyId.toString(),
-                    members: party!.members,
-                    stopovers: party!.stopovers,
-                  ),
-                ),
-              );
-            },
-            child: const Text('이동'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
+    if (_loading || party == null) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (party == null) {
-      return const Scaffold(
-        body: Center(child: Text('파티 정보를 불러올 수 없습니다.')),
       );
     }
 
@@ -303,7 +258,7 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      party!.partyOption.label,
+                      party!.partyOption as String,
                       style: const TextStyle(fontSize: 14),
                     ),
                   ],
@@ -339,34 +294,6 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
                 ),
               );
             }).toList(),
-
-            const SizedBox(height: 24),
-
-            // 정산 페이지로 이동 버튼
-            if (party!.members.length >= party!.maxPerson)
-              Center(
-                child: ElevatedButton.icon(
-                  icon: const Icon(Icons.payment),
-                  label: const Text('정산 페이지로 이동'),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => FareSettingScreen(
-                          partyId: party!.partyId.toString(),
-                          members: party!.members,
-                          stopovers: party!.stopovers,
-                        ),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
       ),
