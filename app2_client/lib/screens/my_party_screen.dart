@@ -16,6 +16,7 @@ import 'package:app2_client/services/party_service.dart';
 import 'package:app2_client/screens/stopover_setting_screen.dart';
 import 'package:app2_client/screens/chat_room_screen.dart';
 
+import '../models/location_model.dart';
 import '../models/party_member_model.dart';
 
 class MyPartyScreen extends StatefulWidget {
@@ -72,24 +73,9 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
       if (_subscribed) return;
 
       // ─── 참여 요청 응답 구독 (호스트 전용) ────────────────────────────────
-      // 백엔드가 '/user/queue/join-request-response' 채널로 PENDING/ACCEPTED/REJECTED 알림을 보냅니다.
       SocketService.subscribeJoinRequestResponse(onMessage: (msg) {
-        // msg 예시:
-        // {
-        //   "partyId": 84,
-        //   "requestId": 123,
-        //   "requesterEmail": "user@example.com",
-        //   "hostEmail": "me@domain.com",
-        //   "status": "PENDING",
-        //   "message": "...",
-        //   "respondedAt": "2025-06-05T12:51:02.061"
-        // }
-
         final incomingPartyId = msg['partyId']?.toString();
         final status = msg['status'] as String? ?? '';
-        final requestId = msg['requestId'] as int?; // null 체크는 하지 않았습니다
-
-        // “내 파티 ID”와 같고, ‘신규 요청(PENDING)’ 일 때만 대기열에 추가
         if (incomingPartyId == _party.partyId.toString() && status == 'PENDING') {
           try {
             final joinRequest = JoinRequest.fromJson(msg);
@@ -199,6 +185,14 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
     }
   }
 
+  /// 설명 저장
+  void _saveDesc() {
+    setState(() {
+      _desc = _descController.text.trim();
+      _editingDesc = false;
+    });
+  }
+
   /// 참여 요청 수락
   Future<void> _acceptRequest(int requestId) async {
     final token =
@@ -213,7 +207,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
       setState(() {
         _joinRequests.removeWhere((r) => r.requestId == requestId);
       });
-      // subscribePartyMembers 쪽으로 MEMBER_JOIN 브로드캐스트가 와서 _party 갱신됨
+      // MEMBER_JOIN 브로드캐스트를 받아 자동 갱신됨
     } catch (e) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('수락 실패: $e')));
@@ -240,14 +234,276 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
     }
   }
 
-  /// 경유지 추가 다이얼로그 (생략)
-  Future<void> _addStopoverDialog() async { /* … */ }
+  /// 경유지 추가 다이얼로그
+  Future<void> _addStopoverDialog() async {
+    final token =
+        Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
+    if (token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('로그인이 필요합니다.')),
+      );
+      return;
+    }
 
-  /// 경유지 수정 다이얼로그 (생략)
-  Future<void> _updateStopoverDialog(StopoverResponse existing) async { /* … */ }
+    String email = '';
+    String address = '';
+    String latStr = '';
+    String lngStr = '';
 
-  /// 정산자 지정 다이얼로그 (생략)
-  Future<void> _designateBookkeeperDialog(PartyMember member) async { /* … */ }
+    final _emailController = TextEditingController();
+    final _addressController = TextEditingController();
+    final _latController = TextEditingController();
+    final _lngController = TextEditingController();
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('경유지 추가'),
+          content: SingleChildScrollView(
+            child: Column(
+              children: [
+                TextField(
+                  controller: _emailController,
+                  decoration:
+                  const InputDecoration(labelText: '내릴 유저 이메일'),
+                ),
+                TextField(
+                  controller: _addressController,
+                  decoration: const InputDecoration(labelText: '주소'),
+                ),
+                TextField(
+                  controller: _latController,
+                  decoration: const InputDecoration(labelText: '위도'),
+                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                ),
+                TextField(
+                  controller: _lngController,
+                  decoration: const InputDecoration(labelText: '경도'),
+                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: const Text('취소'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            ElevatedButton(
+              child: const Text('추가'),
+              onPressed: () async {
+                email = _emailController.text.trim();
+                address = _addressController.text.trim();
+                latStr = _latController.text.trim();
+                lngStr = _lngController.text.trim();
+
+                if (email.isEmpty ||
+                    address.isEmpty ||
+                    latStr.isEmpty ||
+                    lngStr.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('모든 항목을 입력해주세요.')),
+                  );
+                  return;
+                }
+
+                final lat = double.tryParse(latStr);
+                final lng = double.tryParse(lngStr);
+                if (lat == null || lng == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('위도/경도를 올바르게 입력해주세요.')),
+                  );
+                  return;
+                }
+
+                try {
+                  final List<StopoverResponse> newList =
+                  await PartyService.addStopover(
+                    partyId: _party.partyId.toString(),
+                    memberEmail: email,
+                    location: LocationModel(
+                        address: address, lat: lat, lng: lng),
+                    accessToken: token,
+                  );
+
+                  setState(() {
+                    _stopoverList = newList;
+                  });
+
+                  if (newList.isNotEmpty) {
+                    final added = newList.firstWhere(
+                            (e) =>
+                        e.stopover.location.address == address &&
+                            e.partyMembers.any((m) => m.email == email),
+                        orElse: () => newList.first);
+
+                    Navigator.of(context).pop();
+
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => StopoverSettingScreen(
+                          partyId: _party.partyId.toString(),
+                          stopoverData: added,
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('경유지 추가 실패: $e')),
+                  );
+                }
+
+                Navigator.of(context).pop();
+                _refreshAllMarkers();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// 경유지 수정 다이얼로그
+  Future<void> _updateStopoverDialog(StopoverResponse existing) async {
+    final token =
+        Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
+    if (token == null) return;
+
+    String email = existing.partyMembers.isNotEmpty
+        ? existing.partyMembers.first.email
+        : '';
+    String address = existing.stopover.location.address;
+    String latStr = existing.stopover.location.lat.toString();
+    String lngStr = existing.stopover.location.lng.toString();
+
+    final _emailController = TextEditingController(text: email);
+    final _addressController = TextEditingController(text: address);
+    final _latController = TextEditingController(text: latStr);
+    final _lngController = TextEditingController(text: lngStr);
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('경유지 수정'),
+          content: SingleChildScrollView(
+            child: Column(
+              children: [
+                TextField(
+                  controller: _emailController,
+                  decoration:
+                  const InputDecoration(labelText: '내릴 유저 이메일'),
+                ),
+                TextField(
+                  controller: _addressController,
+                  decoration: const InputDecoration(labelText: '주소'),
+                ),
+                TextField(
+                  controller: _latController,
+                  decoration: const InputDecoration(labelText: '위도'),
+                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                ),
+                TextField(
+                  controller: _lngController,
+                  decoration: const InputDecoration(labelText: '경도'),
+                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: const Text('취소'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            ElevatedButton(
+              child: const Text('수정'),
+              onPressed: () async {
+                email = _emailController.text.trim();
+                address = _addressController.text.trim();
+                latStr = _latController.text.trim();
+                lngStr = _lngController.text.trim();
+
+                final double? lat = double.tryParse(latStr);
+                final double? lng = double.tryParse(lngStr);
+
+                try {
+                  final List<StopoverResponse> updatedList =
+                  await PartyService.updateStopover(
+                    partyId: _party.partyId.toString(),
+                    stopoverId: existing.stopover.id,
+                    memberEmail: email.isEmpty ? null : email,
+                    location: (lat != null && lng != null)
+                        ? LocationModel(address: address, lat: lat, lng: lng)
+                        : null,
+                    accessToken: token,
+                  );
+                  setState(() {
+                    _stopoverList = updatedList;
+                  });
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('경유지 수정 실패: $e')),
+                  );
+                }
+
+                Navigator.of(context).pop();
+                _refreshAllMarkers();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// 정산자 지정 다이얼로그
+  Future<void> _designateBookkeeperDialog(PartyMember member) async {
+    final token =
+        Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
+    if (token == null) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('정산자 지정 확인'),
+          content: Text('${member.name}님을 정산자로 지정하시겠습니까?'),
+          actions: [
+            TextButton(
+              child: const Text('취소'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            ElevatedButton(
+              child: const Text('확인'),
+              onPressed: () async {
+                try {
+                  await PartyService.designateBookkeeper(
+                    partyId: _party.partyId.toString(),
+                    partyMemberId: member.id.toString(),
+                    accessToken: token,
+                  );
+                  final refreshed = await PartyService.fetchPartyDetailById(
+                      _party.partyId.toString());
+                  setState(() {
+                    _party = refreshed;
+                  });
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('정산자 지정 실패: $e')));
+                }
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -272,24 +528,104 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                 children: [
                   const SizedBox(height: 12),
 
-                  // 설명 출력·수정 (생략)
+                  // 설명 출력·수정
+                  _editingDesc
+                      ? Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _descController,
+                          autofocus: true,
+                          decoration: const InputDecoration(
+                            hintText: '설명을 입력하세요',
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.check,
+                            color: Colors.green),
+                        onPressed: _saveDesc,
+                      ),
+                    ],
+                  )
+                      : Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _desc!.isEmpty ? '설명을 추가하세요' : _desc!,
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.edit, size: 20),
+                        onPressed: () =>
+                            setState(() => _editingDesc = true),
+                      ),
+                    ],
+                  ),
 
                   const SizedBox(height: 12),
 
-                  // 해시태그 (생략)
+                  // 해시태그
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      _tag('#${_party.maxPerson}인팟'),
+                      _tag(_party.partyOption == 'MIXED' ? '#혼성' : '#동성만'),
+                    ],
+                  ),
 
                   const SizedBox(height: 24),
 
-                  // 경유지 추가 버튼 (생략)
+                  // 경유지 추가 버튼
+                  Center(
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.add_road),
+                      label: const Text('경유지 추가'),
+                      onPressed: _addStopoverDialog,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                      ),
+                    ),
+                  ),
 
                   const SizedBox(height: 24),
                   const Divider(),
 
-                  // 경유지 목록 (생략)
-
-                  const SizedBox(height: 24),
-
-                  const Divider(),
+                  // **경유지 목록**
+                  if (_stopoverList.isNotEmpty) ...[
+                    const Text('경유지 목록',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    ..._stopoverList.map((s) {
+                      return ListTile(
+                        title: Text(s.stopover.location.address),
+                        subtitle: Text(
+                          '하차자: ${s.partyMembers.map((m) => m.name).join(", ")}',
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.edit),
+                          onPressed: () {
+                            _updateStopoverDialog(s);
+                          },
+                        ),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => StopoverSettingScreen(
+                                partyId: _party.partyId.toString(),
+                                stopoverData: s,
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    }).toList(),
+                    const SizedBox(height: 24),
+                    const Divider(),
+                  ],
 
                   // 파티원 목록 & 정산자 지정 버튼
                   const Text('파티원 목록',
@@ -363,7 +699,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                     const SizedBox(height: 16),
                   ],
 
-                  // 디버그 정보 (생략)
+                  // 디버그 정보
                   const Divider(),
                   Container(
                     padding: const EdgeInsets.all(8),
@@ -405,4 +741,13 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
+
+  Widget _tag(String label) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    decoration: BoxDecoration(
+      color: Colors.grey[300],
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Text(label, style: const TextStyle(fontSize: 12)),
+  );
 }
