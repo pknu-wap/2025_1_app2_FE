@@ -39,15 +39,43 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
         Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
     if (token == null) return;
 
-    SocketService.connect(token, onConnect: () {
+    // 구독 로직을 함수로 분리
+    void _doSubscribe() {
       if (!_subscribed) {
+        // 1) 파티 멤버 업데이트 브로드캐스트 구독
         SocketService.subscribePartyMembers(
           partyId: int.parse(widget.partyId),
           onMessage: (_) => _fetchParty(),
         );
+
+        // 2) 개인적인 참여 요청 응답 구독
+        SocketService.subscribeJoinRequestResponse(onMessage: (msg) {
+          final status = msg['status'] as String;
+          if (status == 'ACCEPTED') {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('참여 요청이 수락되었어!')),
+            );
+            _fetchParty();
+          } else if (status == 'REJECTED') {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('참여 요청이 거절되었어.')),
+            );
+          }
+        });
+
         _subscribed = true;
       }
+    }
+
+    // STOMP 연결 시도
+    SocketService.connect(token, onConnect: () {
+      _doSubscribe();
     });
+
+    // 이미 연결되어 있으면 바로 구독
+    if (SocketService.connected) {
+      _doSubscribe();
+    }
   }
 
   Future<void> _fetchParty() async {
@@ -62,7 +90,7 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('파티 정보를 불러올 수 없습니다: $e')),
+          SnackBar(content: Text('파티 정보를 불러올 수 없어: $e')),
         );
       }
     } finally {
