@@ -5,7 +5,6 @@ import 'package:app2_client/services/websocket_service.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:app2_client/services/fare_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:app2_client/screens/review_page.dart';
 import 'package:app2_client/models/party_member_model.dart';
@@ -20,21 +19,19 @@ class FareResultScreen extends StatefulWidget {
   final String bookkeeperEmail;
 
   const FareResultScreen.bookkeeper({
-    Key? key,
+    super.key,
     required this.partyId,
     required this.bookkeeperEmail,
-  }) : isBookkeeper = true,
-       super(key: key);
+  }) : isBookkeeper = true;
 
   const FareResultScreen.user({
-    Key? key,
+    super.key,
     required this.partyId,
     required this.bookkeeperEmail,
-  }) : isBookkeeper = false,
-       super(key: key);
+  }) : isBookkeeper = false;
 
   @override
-  _FareResultScreenState createState() => _FareResultScreenState();
+  State<FareResultScreen> createState() => _FareResultScreenState();
 }
 
 class _FareResultScreenState extends State<FareResultScreen> {
@@ -43,8 +40,6 @@ class _FareResultScreenState extends State<FareResultScreen> {
   bool isLoading = true;
   late final WebSocketService _webSocketService;
   StreamSubscription? _fareSubscription;
-  List<PaymentMemberInfo>? _paymentInfo;
-  String _myEmail = '';
   bool _socketSubscribed = false;
 
   @override
@@ -54,8 +49,6 @@ class _FareResultScreenState extends State<FareResultScreen> {
     _loadCurrentUserEmail();
     fetchFareData();
     _setupWebSocket();
-    _loadPaymentInfo();
-    _myEmail = Provider.of<AuthProvider>(context, listen: false).userEmail ?? '';
     _connectAndSubscribe();
 
     // 정산 완료 이벤트 구독
@@ -80,7 +73,7 @@ class _FareResultScreenState extends State<FareResultScreen> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final token = authProvider.jwtToken;
     
-    _webSocketService.connect(widget.partyId, token!);
+    _webSocketService.connect(widget.partyId, token);
     _fareSubscription = _webSocketService.fareUpdates.listen((data) {
       final usersList = List<Map<String, dynamic>>.from(data['users']);
       setState(() {
@@ -101,7 +94,7 @@ class _FareResultScreenState extends State<FareResultScreen> {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (context) => const ReviewPage(),
+        builder: (context) => ReviewPage(partyId: widget.partyId),
       ),
     );
   }
@@ -168,12 +161,10 @@ class _FareResultScreenState extends State<FareResultScreen> {
       );
 
       if (response.statusCode == 200) {
-        // WebSocket을 통해 업데이트될 것이므로 fetchFareData() 호출 제거
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('확인 처리되었습니다.')),
         );
 
-        // 정산자가 모든 사용자의 정산을 확인했는지 체크
         if (widget.isBookkeeper && _isAllUsersConfirmed()) {
           _navigateToPartyEvaluation();
         }
@@ -211,63 +202,6 @@ class _FareResultScreenState extends State<FareResultScreen> {
         memberName: memberName,
         amount: amount,
       ).show();
-    }
-  }
-
-  Future<void> _loadPaymentInfo() async {
-    try {
-      final token = Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
-      final result = await PaymentService.getPaymentInfo(
-        partyId: widget.partyId,
-        accessToken: token!,
-      );
-      setState(() => _paymentInfo = result);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('정산 정보를 불러오는데 실패했습니다: $e')),
-      );
-    }
-  }
-
-  Future<void> _markAsComplete(PaymentMemberInfo info) async {
-    try {
-      final token = Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
-      
-      if (!widget.isBookkeeper) {
-        // 일반 멤버가 입금 완료 표시할 때
-        SocketService.sendPaymentCompleteNotification(
-          partyId: int.parse(widget.partyId),
-          memberName: info.memberInfo.name,
-          amount: info.paymentInfo.finalFare,
-        );
-      }
-
-      await PaymentService.confirmPayment(
-        partyId: widget.partyId,
-        partyMemberId: info.memberInfo.id,
-        stopoverId: info.paymentInfo.stopoverId,
-        accessToken: token!,
-      );
-
-      await _loadPaymentInfo();  // 정보 새로고침
-
-      // 정산자인 경우, 모든 멤버의 정산이 완료되었는지 확인
-      if (widget.isBookkeeper && _paymentInfo != null) {
-        bool allConfirmed = _paymentInfo!.every((member) => 
-          member.paymentInfo.isPaid || member.memberInfo.email == _myEmail
-        );
-
-        if (allConfirmed) {
-          // 모든 정산이 완료되면 전체 파티원에게 알림
-          SocketService.sendAllPaymentsComplete(
-            partyId: int.parse(widget.partyId),
-          );
-        }
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('처리 중 오류가 발생했습니다: $e')),
-      );
     }
   }
 
@@ -344,7 +278,7 @@ class _FareResultScreenState extends State<FareResultScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  '${amount}원',
+                                  '$amount원',
                                   style: const TextStyle(
                                     fontSize: 14,
                                     color: Colors.grey,

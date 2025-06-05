@@ -40,4 +40,30 @@ class PaymentService {
       throw Exception('요금 승인 처리 중 오류가 발생했습니다: $e');
     }
   }
+
+  static Future<List<PaymentMemberInfo>> getPaymentInfo({
+    required String partyId,
+    required String accessToken,
+  }) async {
+    final url = Uri.parse('$baseUrl/api/party/$partyId/fare/info');
+    
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': accessToken,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> jsonList = jsonDecode(response.body);
+        return jsonList.map((json) => PaymentMemberInfo.fromJson(json)).toList();
+      } else {
+        throw Exception('정산 정보를 가져오는데 실패했습니다: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('정산 정보를 가져오는데 실패했습니다: $e');
+    }
+  }
 } 

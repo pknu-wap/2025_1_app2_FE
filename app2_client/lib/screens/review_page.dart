@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 
 class ReviewPage extends StatefulWidget {
-  const ReviewPage({super.key});
+  final String partyId;
+
+  const ReviewPage({
+    super.key,
+    required this.partyId,
+  });
 
   @override
   State<ReviewPage> createState() => _ReviewPageState();
