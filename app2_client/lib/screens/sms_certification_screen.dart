@@ -208,7 +208,7 @@ class _SmsCertificationScreenState extends State<SmsCertificationScreen> {
               children: [
                 Text(
                   '받는 사람',
-                  style: TextStyle(
+                style: TextStyle(
                     fontSize: 15,
                     color: Colors.grey[600],
                   ),
@@ -216,15 +216,15 @@ class _SmsCertificationScreenState extends State<SmsCertificationScreen> {
                 const SizedBox(width: 8),
                 const Text(
                   'verify@gmail.com',
-                  style: TextStyle(
+                    style: TextStyle(
                     color: Color(0xFF003366),
                     fontWeight: FontWeight.w500,
                     fontSize: 15,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
           // 구분선
           Container(
             height: 1,
@@ -251,10 +251,10 @@ class _SmsCertificationScreenState extends State<SmsCertificationScreen> {
                       color: Colors.grey[100],
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: Colors.grey[300]!),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
+              ),
+              child: Row(
+                children: [
+                  Expanded(
                           child: Text(
                             'kjsu34kjd9fdjflejdnalsmcff8d7djldkfls3k5',
                             style: TextStyle(
@@ -262,11 +262,11 @@ class _SmsCertificationScreenState extends State<SmsCertificationScreen> {
                               fontSize: 13,
                             ),
                             overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
+                    ),
+                  ),
                         const SizedBox(width: 8),
-                        Icon(
-                          Icons.arrow_upward_rounded,
+                  Icon(
+                    Icons.arrow_upward_rounded,
                           color: const Color(0xFF003366),
                           size: 24,
                         ),

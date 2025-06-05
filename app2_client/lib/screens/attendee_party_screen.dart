@@ -75,7 +75,7 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
         final status = msg['status'] as String? ?? '';
         final requesterEmail = msg['requesterEmail'] as String? ?? '';
 
-        // “내 요청”인지, “내가 보고 있는 파티”인지 확인
+        // "내 요청"인지, "내가 보고 있는 파티"인지 확인
         if (incomingPartyId == widget.partyId &&
             requesterEmail == _currentUserEmail) {
           if (status == 'PENDING') {
@@ -107,7 +107,7 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
     SocketService.connect(token, onConnect: () {
       _doSubscribe();
     });
-    if (SocketService.connected) {
+    if (SocketService.isConnected) {
       _doSubscribe();
     }
   }

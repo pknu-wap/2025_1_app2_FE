@@ -3,6 +3,7 @@
 import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';  // VoidCallback을 위한 import 추가
 
 import 'package:app2_client/constants/api_constants.dart';
 import 'package:app2_client/services/dio_client.dart';
@@ -257,6 +258,90 @@ class SocketService {
       },
     );
     print('👂 구독: /user/queue/join-requests');
+  }
+
+  /// 정산 완료 이벤트 구독
+  static void subscribePaymentComplete({
+    required int partyId,
+    required VoidCallback onComplete,
+  }) {
+    if (!_connected || _client == null) {
+      print('⚠️ subscribePaymentComplete: STOMP 클라이언트가 연결되지 않았습니다.');
+      return;
+    }
+
+    _client!.subscribe(
+      destination: '/topic/payments/complete/$partyId',
+      callback: (frame) {
+        print('👋 정산 완료 알림 수신: ${frame.body}');
+        onComplete();
+      },
+    );
+    print('👂 구독: /topic/payments/complete/$partyId');
+  }
+
+  /// 결제 알림 구독
+  static void subscribePaymentNotification({
+    required int partyId,
+    required Function(Map<String, dynamic>) onMessage,
+  }) {
+    if (!_connected || _client == null) {
+      print('⚠️ subscribePaymentNotification: STOMP 클라이언트가 연결되지 않았습니다.');
+      return;
+    }
+
+    _client!.subscribe(
+      destination: '/topic/payments/notification/$partyId',
+      callback: (StompFrame frame) {
+        if (frame.body != null) {
+          final data = json.decode(frame.body!);
+          if (data is Map<String, dynamic>) {
+            onMessage(data);
+          }
+        }
+      },
+    );
+    print('👂 구독: /topic/payments/notification/$partyId');
+  }
+
+  /// 입금 완료 알림 전송
+  static void sendPaymentCompleteNotification({
+    required int partyId,
+    required String memberName,
+    required int amount,
+  }) {
+    if (!_connected || _client == null) {
+      print('⚠️ sendPaymentCompleteNotification: STOMP 클라이언트가 연결되지 않았습니다.');
+      return;
+    }
+    _client!.send(
+      destination: '/topic/payments/complete',
+      body: jsonEncode({
+        'party_id': partyId,
+        'member_name': memberName,
+        'amount': amount,
+        'timestamp': DateTime.now().toIso8601String(),
+      }),
+    );
+    print('👋 입금 완료 알림 전송: /topic/payments/complete');
+  }
+
+  /// 정산 완료 알림 전송 (정산자가 모든 정산을 확인 완료했을 때)
+  static void sendAllPaymentsComplete({
+    required int partyId,
+  }) {
+    if (!_connected || _client == null) {
+      print('⚠️ sendAllPaymentsComplete: STOMP 클라이언트가 연결되지 않았습니다.');
+      return;
+    }
+    _client!.send(
+      destination: '/topic/payments/complete/$partyId',
+      body: jsonEncode({
+        'party_id': partyId,
+        'timestamp': DateTime.now().toIso8601String(),
+      }),
+    );
+    print('👋 정산 완료 알림 전송: /topic/payments/complete/$partyId');
   }
 
   /// 연결 종료

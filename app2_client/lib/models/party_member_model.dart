@@ -2,29 +2,48 @@
 
 class PartyMember {
   final int id;
-  final String name;
   final String email;
-  final String gender;          // e.g. "MALE" or "FEMALE"
-  final String role;            // e.g. "HOST", "MEMBER", "BOOKKEEPER"
-  final String additionalRole;  // 예: HOST 가 BOOKKEEPER 겸하면 "BOOKKEEPER", 아니면 "NONE"
+  final String name;
+  final bool confirmed;
+  final int amount;
+  final String? role;  // 방장, 팀원 등
+  final String? gender; // MALE 또는 FEMALE
+  final String? additionalRole; // BOOKKEEPER 등
 
   PartyMember({
     required this.id,
-    required this.name,
     required this.email,
-    required this.gender,
-    required this.role,
-    required this.additionalRole,
+    required this.name,
+    required this.confirmed,
+    required this.amount,
+    this.role,
+    this.gender,
+    this.additionalRole,
   });
 
   factory PartyMember.fromJson(Map<String, dynamic> json) {
     return PartyMember(
       id: json['id'] as int,
-      name: json['name'] as String,
       email: json['email'] as String,
-      gender: json['gender'] as String,
-      role: json['role'] as String,
-      additionalRole: json['additional_role'] as String? ?? 'NONE',
+      name: json['name'] as String,
+      confirmed: json['confirmed'] as bool,
+      amount: json['amount'] as int,
+      role: json['role'] as String?,
+      gender: json['gender'] as String?,
+      additionalRole: json['additional_role'] as String?,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'email': email,
+      'name': name,
+      'confirmed': confirmed,
+      'amount': amount,
+      if (role != null) 'role': role,
+      if (gender != null) 'gender': gender,
+      if (additionalRole != null) 'additional_role': additionalRole,
+    };
   }
 }

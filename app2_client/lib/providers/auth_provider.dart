@@ -15,6 +15,17 @@ class AuthProvider extends ChangeNotifier {
 
   UserModel? get user => _user;
   AuthResponse? get tokens => _tokens;
+  String? get userEmail => _user?.email;
+
+  int get userId {
+    if (_user == null) throw Exception('User not logged in');
+    return _user!.id!;
+  }
+
+  String get jwtToken {
+    if (_tokens == null) throw Exception('Token not available');
+    return _tokens!.jwt;
+  }
 
   /// 사용자 이메일 편의 getter
   String? get email => _user?.email;
