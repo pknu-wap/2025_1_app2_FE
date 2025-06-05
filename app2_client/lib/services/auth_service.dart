@@ -73,17 +73,11 @@ class AuthService {
 
       _printIdTokenPayload(idToken);
 
-      // 사용자 프로필 정보 가져오기
-      final userInfo = await account.authentication;
-      final gender = userInfo.idToken != null ? 
-          _extractGenderFromIdToken(userInfo.idToken!) : null;
-
       return UserModel(
         email: account.email,
         name: account.displayName ?? '',
         idToken: idToken,
         accessToken: accessToken,
-        gender: gender,
       );
     } catch (e) {
       print('🔴 Google 로그인 실패: $e');
