@@ -33,7 +33,7 @@ class PartyDetail {
   });
 
   factory PartyDetail.fromJson(Map<String, dynamic> json) {
-    // JSON 구조에 따라 “party_start”와 “party_destination” 에서 address/lat/lng 를 꺼냅니다.
+    // JSON 구조에 따라 "party_start"와 "party_destination" 에서 address/lat/lng 를 꺼냅니다.
     final startLocation = json['party_start']?['location'] as Map<String, dynamic>? ?? {};
     final destLocation  = json['party_destination']?['location'] as Map<String, dynamic>? ?? {};
 
@@ -51,7 +51,8 @@ class PartyDetail {
         [];
 
     final stopoverList = (json['party_stopovers'] as List<dynamic>?)
-        ?.map((e) => StopoverResponse.fromJson(e as Map<String, dynamic>))
+        ?.where((e) => e != null)
+        .map((e) => StopoverResponse.fromJson(e as Map<String, dynamic>))
         .toList() ?? [];
 
     return PartyDetail(
