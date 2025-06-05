@@ -8,6 +8,8 @@ import 'package:app2_client/models/party_detail_model.dart';
 import 'package:app2_client/models/stopover_model.dart';
 import 'package:app2_client/models/location_model.dart';
 import 'package:app2_client/services/dio_client.dart';
+import 'package:app2_client/services/socket_service.dart';
+import 'dart:convert';
 
 import '../models/party_member_model.dart';
 
@@ -104,10 +106,9 @@ class PartyService {
         options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
       );
       if (response.statusCode != 200) {
-        throw Exception('파티 참여 실패: ${response.data}');
+        throw Exception('파티 참여 실패: \\${response.data}');
       }
     } on DioException catch (e) {
-      // DioException을 그대로 다시 던져서 호출하는 곳에서 상태 코드별로 처리할 수 있도록 함
       throw e;
     } catch (e) {
       throw Exception('파티 참여 실패: $e');
