@@ -106,6 +106,24 @@ class AuthService {
     }
   }
 
+  // ID 토큰에서 성별 정보 추출
+  String? _extractGenderFromIdToken(String idToken) {
+    try {
+      final parts = idToken.split('.');
+      if (parts.length != 3) return null;
+      
+      final payload = parts[1];
+      final normalized = base64Url.normalize(payload);
+      final decoded = utf8.decode(base64Url.decode(normalized));
+      final data = json.decode(decoded);
+      
+      return data['gender'] as String?;
+    } catch (e) {
+      print('🔴 ID 토큰 파싱 실패: $e');
+      return null;
+    }
+  }
+
   /// 백엔드 로그인 호출 (/api/oauth/login)
   Future<AuthResponse?> loginOnServer({
     required String idToken,

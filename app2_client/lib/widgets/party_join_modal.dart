@@ -8,6 +8,7 @@ import 'package:app2_client/services/party_service.dart';
 import 'package:app2_client/services/socket_service.dart';
 import 'package:app2_client/providers/auth_provider.dart';
 import 'package:app2_client/screens/attendee_party_screen.dart';
+import 'package:app2_client/models/party_option.dart';
 
 class PartyJoinModal extends StatefulWidget {
   final PartyModel pot;
@@ -62,7 +63,7 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
         // 1) 모달을 닫는다.
         if (mounted) Navigator.of(context).pop();
 
-        // 2) 사용자에게 “참여 완료됨” 스낵바 띄우기
+        // 2) 사용자에게 "참여 완료됨" 스낵바 띄우기
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('참여 요청이 수락되었어!')),
@@ -82,7 +83,7 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
         }
       }
 
-      // 만약 “REJECTED” 메시지를 받으면 알림만 띄우고 모달은 열어둔 상태로 유지할 수도 있다.
+      // 만약 "REJECTED" 메시지를 받으면 알림만 띄우고 모달은 열어둔 상태로 유지할 수도 있다.
       if (partyId.toString() == widget.pot.id && status == 'REJECTED') {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -120,7 +121,7 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
         accessToken: token,
       );
 
-      // 2) API 호출 성공 → “승인을 기다리는 중입니다” 스낵바 띄우기
+      // 2) API 호출 성공 → "승인을 기다리는 중입니다" 스낵바 띄우기
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('승인을 기다리는 중입니다...')),
@@ -128,7 +129,7 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
       }
 
       // 3) 모달은 닫지 않고 그대로 두어서,
-      //    이후 백엔드에서 보내줄 “ACCEPTED” 메시지를 대기한다.
+      //    이후 백엔드에서 보내줄 "ACCEPTED" 메시지를 대기한다.
     } catch (e) {
       // 4) API 호출 실패 시 에러 메시지 표시
       setState(() {
@@ -169,7 +170,7 @@ class _PartyJoinModalState extends State<PartyJoinModal> {
 
             // ─── 타이틀 ─────────────────────────────────────────────────────
             Text(
-              '“${widget.pot.creatorName}” 님의 팟에 참여하기',
+              '"${widget.pot.creatorName}" 님의 팟에 참여하기',
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),

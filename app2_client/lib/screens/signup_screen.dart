@@ -24,6 +24,19 @@ class _SignupScreenState extends State<SignupScreen> {
   final _form = GlobalKey<FormState>();
   String _phone = '', _age = '20', _gender = 'MALE';
   bool _isLoading = false;
+  late TextEditingController _nameController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.name);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
 
   Future<void> _submit() async {
     if (!_form.currentState!.validate()) return;
@@ -43,7 +56,7 @@ class _SignupScreenState extends State<SignupScreen> {
         session: widget.session,
         idToken: widget.idToken,
         accessToken: widget.accessToken,
-        name: widget.name,
+        name: _nameController.text.trim(),
         phone: cleanPhone,
         age: 20,
         gender: _gender,
@@ -59,7 +72,7 @@ class _SignupScreenState extends State<SignupScreen> {
         // 사용자 정보 저장
         await SecureStorageService().saveUserInfo(
           userId: widget.email,
-          userName: widget.name,
+          userName: _nameController.text.trim(),
         );
 
         if (!mounted) return;
@@ -119,8 +132,8 @@ class _SignupScreenState extends State<SignupScreen> {
                 Text('이름'),
                 SizedBox(height: 8),
                 TextFormField(
-                  initialValue: widget.name,
-                  readOnly: true,
+                  controller: _nameController,
+                  validator: (v) => v == null || v.trim().isEmpty ? '이름을 입력하세요' : null,
                   decoration: InputDecoration(
                     hintText: '이름',
                     filled: false,

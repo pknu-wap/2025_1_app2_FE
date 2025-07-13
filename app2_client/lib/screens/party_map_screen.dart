@@ -231,20 +231,38 @@ class _PartyMapScreenState extends State<PartyMapScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _controller == null
-          ? const Center(child: CircularProgressIndicator())
-          : Stack(
+      body: Stack(
         children: [
-          WebViewWidget(controller: _controller!),
-          const Positioned(top: 40, left: 16, child: CustomBackButton()),
+          _controller == null
+              ? const Center(child: CircularProgressIndicator())
+              : WebViewWidget(controller: _controller!),
+          const Positioned(
+            top: 40,
+            left: 16,
+            child: CustomBackButton(),
+          ),
         ],
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              backgroundColor: const Color(0xFF003366),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
             onPressed: _pageLoaded ? _openCreateModal : null,
-            child: const Text('파티 추가하기'),
+            child: const Text(
+              '파티 생성하기',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
           ),
         ),
       ),

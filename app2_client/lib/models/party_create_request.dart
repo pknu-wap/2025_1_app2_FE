@@ -1,5 +1,7 @@
 // lib/models/party_create_request.dart
 
+import 'package:app2_client/models/party_option.dart';
+
 class Location {
   final String address;
   final double lat;
@@ -38,7 +40,7 @@ class PartyCreateRequest {
   final Stopover partyDestination;
   final double partyRadius;
   final int partyMaxPerson;
-  final String partyOption;
+  final PartyOption partyOption;
 
   PartyCreateRequest({
     required Location partyStart,
@@ -54,6 +56,6 @@ class PartyCreateRequest {
     'party_destination': partyDestination.location.toJson(),
     'party_radius': partyRadius,
     'party_max_person': partyMaxPerson,
-    'party_option': partyOption,
+    'party_option': partyOption.toString(),
   };
 }

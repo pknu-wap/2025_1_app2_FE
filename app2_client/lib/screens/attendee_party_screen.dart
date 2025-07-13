@@ -2,7 +2,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:webview_flutter/webview_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:app2_client/models/party_detail_model.dart';
 import 'package:app2_client/services/party_service.dart';
@@ -29,10 +28,6 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
   PartyDetail? party;
   bool _loading = true;
   bool _subscribed = false;
-
-  // WebView 관련
-  WebViewController? _mapController;
-  bool _mapLoaded = false;
 
   /// 현재 로그인된 사용자의 이메일을 가져옵니다.
   /// AuthProvider.user 안에 UserModel이 들어있고,
@@ -75,7 +70,7 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
         final status = msg['status'] as String? ?? '';
         final requesterEmail = msg['requesterEmail'] as String? ?? '';
 
-        // “내 요청”인지, “내가 보고 있는 파티”인지 확인
+        // "내 요청"인지, "내가 보고 있는 파티"인지 확인
         if (incomingPartyId == widget.partyId &&
             requesterEmail == _currentUserEmail) {
           if (status == 'PENDING') {
@@ -107,101 +102,40 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
     SocketService.connect(token, onConnect: () {
       _doSubscribe();
     });
-    if (SocketService.connected) {
+    if (SocketService.isConnected) {
       _doSubscribe();
     }
   }
 
   /// PartyDetail을 서버에서 조회하고, 화면-지도 초기화
   Future<void> _fetchParty() async {
-    setState(() => _loading = true);
     try {
-      final fetched = await PartyService.fetchPartyDetailById(widget.partyId);
-      if (mounted) {
-        setState(() {
-          party = fetched;
-        });
-        // 화면이 렌더링된 이후에 지도(WebView)를 초기화
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _initMapWebView();
-        });
-      }
+      final token = Provider.of<AuthProvider>(context, listen: false).tokens?.accessToken;
+      if (token == null) return;
+
+      final fetchedParty = await PartyService.fetchPartyDetailById(widget.partyId);
+      setState(() {
+        party = fetchedParty;
+        _loading = false;
+      });
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('파티 정보를 불러올 수 없습니다: $e')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _loading = false);
+      setState(() {
+        _loading = false;
+      });
     }
-  }
-
-  /// WebView(카카오 지도) 초기화 및 HTML 로드
-  Future<void> _initMapWebView() async {
-    if (party == null) return;
-
-    // HTML 템플릿을 assets에서 불러옵니다.
-    final raw = await rootBundle.loadString('assets/kakao_party_map.html');
-    final kakaoKey = dotenv.env['KAKAO_JS_KEY'] ?? '';
-
-    // 파티의 도착지 좌표로 중심을 설정
-    final centerLat = party!.destLat;
-    final centerLng = party!.destLng;
-    final html = raw
-        .replaceAll('{{KAKAO_JS_KEY}}', kakaoKey)
-        .replaceAll('{{CENTER_LAT}}', centerLat.toString())
-        .replaceAll('{{CENTER_LNG}}', centerLng.toString());
-
-    final wc = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0x00000000))
-      ..addJavaScriptChannel(
-        'MarkerClick',
-        onMessageReceived: (msg) {
-          // 필요하다면 마커 클릭 시 로직 추가
-        },
-      )
-      ..setNavigationDelegate(
-        NavigationDelegate(onPageFinished: (_) {
-          setState(() {
-            _mapLoaded = true;
-          });
-          _renderMarkers();
-        }),
-      )
-      ..loadHtmlString(html, baseUrl: 'about:blank');
-
-    setState(() {
-      _mapController = wc;
-    });
-  }
-
-  /// 출발지(origin)와 도착지(destination)에 마커를 추가합니다.
-  void _renderMarkers() {
-    if (_mapController == null || party == null) return;
-
-    final oLat = party!.originLat;
-    final oLng = party!.originLng;
-    final dLat = party!.destLat;
-    final dLng = party!.destLng;
-
-    final jsOrigin = '''
-      addMarker("origin", $oLat, $oLng, "출발지", "blue");
-    ''';
-    final jsDest = '''
-      addMarker("destination", $dLat, $dLng, "도착지", "red");
-    ''';
-
-    _mapController!.runJavaScript(jsOrigin);
-    _mapController!.runJavaScript(jsDest);
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading || party == null) {
+    if (_loading) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (party == null) {
+      return const Scaffold(
+        body: Center(child: Text('파티 정보를 불러올 수 없습니다.')),
       );
     }
 
@@ -215,20 +149,6 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ─── 지도 영역 ───────────────────────────────────────────
-            Container(
-              height: 240,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                color: Colors.grey[200],
-              ),
-              clipBehavior: Clip.hardEdge,
-              child: _mapController == null
-                  ? const Center(child: CircularProgressIndicator())
-                  : WebViewWidget(controller: _mapController!),
-            ),
-            const SizedBox(height: 16),
-
             // ─── 최대 인원 / 팟 옵션 ───────────────────────────────────
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -258,7 +178,7 @@ class _AttendeePartyScreenState extends State<AttendeePartyScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      party!.partyOption,
+                      party!.partyOption.label,
                       style: const TextStyle(fontSize: 14),
                     ),
                   ],
