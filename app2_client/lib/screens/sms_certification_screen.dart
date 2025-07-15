@@ -1,8 +1,13 @@
+// lib/screens/sms_certification_screen.dart
+// [MODIFIED] 시뮬레이터 테스트를 위해 SMS 인증 과정을 우회하도록 수정된 파일입니다.
+
 import 'package:app2_client/models/sms_session_model.dart';
 import 'package:app2_client/models/sms_verify_model.dart';
 import 'package:app2_client/screens/signup_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_sms/flutter_sms.dart';
+
+// [REMOVED] SMS 전송 기능을 사용하지 않으므로 관련 패키지를 제거합니다.
+// import 'package:flutter_sms/flutter_sms.dart';
 
 import '../services/auth_service.dart';
 
@@ -23,7 +28,6 @@ class SmsCertificationScreen extends StatefulWidget {
 class _SmsCertificationScreenState extends State<SmsCertificationScreen> {
   final AuthService _authService = AuthService();
   bool isVerifying = false;
-  SmsSessionModel? _session;
 
   @override
   Widget build(BuildContext context) {
@@ -50,11 +54,12 @@ class _SmsCertificationScreenState extends State<SmsCertificationScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            _buildStepText('① 하단 [인증 메시지 보내기] 눌러주세요'),
+            // [MODIFIED] 변경된 인증 절차에 맞게 안내 문구를 수정했습니다.
+            _buildStepText('① 하단 [인증 진행하기] 버튼을 눌러주세요.'),
             const SizedBox(height: 16),
-            _buildStepText('② 메시지 작성 창에서, 인증 메시지가 자동으로 입력되어 있습니다.'),
+            _buildStepText('② 시뮬레이터 테스트를 위해 SMS 전송을 건너뛰고, 서버에서 바로 인증을 진행합니다.'),
             const SizedBox(height: 16),
-            _buildStepText('③ 인증 메시지를 그대로 보내주세요.'),
+            _buildStepText('③ 잠시 후 인증이 완료되고, 회원가입 화면으로 이동합니다.'),
             const SizedBox(height: 40),
             Center(child: _buildPhoneMockup()),
             const SizedBox(height: 32),
@@ -70,10 +75,8 @@ class _SmsCertificationScreenState extends State<SmsCertificationScreen> {
               width: double.infinity,
               height: 54,
               child: ElevatedButton(
-                onPressed: isVerifying ? null : () async {
-                  await showSms();
-                  await verifySms();
-                },
+                // [MODIFIED] 버튼 클릭 시 새로운 인증 함수를 호출하도록 변경했습니다.
+                onPressed: isVerifying ? null : _startVerificationProcess,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF003366),
                   shape: RoundedRectangleBorder(
@@ -82,12 +85,12 @@ class _SmsCertificationScreenState extends State<SmsCertificationScreen> {
                   disabledBackgroundColor: Colors.grey[400],
                 ),
                 child: Text(
-                  isVerifying ? '인증 중...' : '인증 메시지 보내기',
+                  // [MODIFIED] 버튼 텍스트를 수정했습니다.
+                  isVerifying ? '인증 중...' : '인증 진행하기',
                   style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: isVerifying ? Colors.grey[600] : Colors.white
-                  ),
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      color: isVerifying ? Colors.grey[600] : Colors.white),
                 ),
               ),
             ),
@@ -98,63 +101,74 @@ class _SmsCertificationScreenState extends State<SmsCertificationScreen> {
     );
   }
 
-  Future<void> showSms() async {
-    _session = await _authService.getSessionKey();
-    if (_session == null) return;
+  // [ADDED] 시뮬레이터 테스트를 위해 SMS 전송을 건너뛰고 바로 서버 인증을 처리하는 새로운 함수입니다.
+  Future<void> _startVerificationProcess() async {
+    if (isVerifying) return;
 
-    final String sendTo = _session!.sendTo; // ex: "@gmail.com"
-    final String smsBody = _session!.key; // ex: "인증용 키"
-
-    isVerifying = true;
-    String result = await sendSMS(message: smsBody, recipients: [sendTo], sendDirect: false)
-        .catchError((error) {
-          if (!mounted) return '';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('SMS 전송을 지원하지 않는 단말기입니다.')),
-      );
-      isVerifying = false;
-      print(error);
-      return '';
+    setState(() {
+      isVerifying = true;
     });
-    if (result != 'sent' && result != 'SMS Sent!') {
-      isVerifying = false;
-      return;
-    }
-  }
-
-  Future<void> verifySms() async {
-    if (!isVerifying || !mounted || _session == null) return;
-
     showLoadingDialog(context);
 
-    await Future.delayed(const Duration(milliseconds: 6000)); // 대기안하면 에러..
-    SmsVerifyModel? model = await _authService.verifySms(_session!.key);
-    if (!mounted) return;
+    try {
+      // 1. 세션 키는 여전히 백엔드로부터 받아와야 합니다.
+      final SmsSessionModel? session = await _authService.getSessionKey();
+      if (!mounted || session == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('세션 정보를 가져오지 못했습니다.')),
+          );
+        }
+        return;
+      }
 
-    hideLoadingDialog(context);
-    isVerifying = false;
+      // 2. [BYPASS] 실제 SMS를 보내는 과정을 생략합니다.
+      // 백엔드가 항상 인증 성공을 반환하므로 바로 다음 단계로 진행합니다.
+      await Future.delayed(const Duration(seconds: 2)); // 통신 지연 시뮬레이션
 
-    if (model == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('인증에 실패했습니다. 다시 시도해 주세요.')),
-      );
-      return;
-    }
+      // 3. SMS 인증 API를 호출합니다. 이 호출은 항상 성공하고 전화번호를 반환합니다.
+      final SmsVerifyModel? model = await _authService.verifySms(session.key);
+      if (!mounted || model == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('인증에 실패했습니다. 다시 시도해 주세요.')),
+          );
+        }
+        return;
+      }
 
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder: (context) => SignupScreen(
-          session: _session!.key,
-          idToken: widget.idToken,
-          accessToken: widget.accessToken,
-          name: widget.name,
-          email: widget.email,
-          phone: model.phoneNumber,
+      // 4. 인증 성공 시, 회원가입 화면으로 이동합니다.
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (context) => SignupScreen(
+            session: session.key,
+            idToken: widget.idToken,
+            accessToken: widget.accessToken,
+            name: widget.name,
+            email: widget.email,
+            phone: model.phoneNumber, // 인증 성공 후 받은 전화번호를 전달합니다.
+          ),
         ),
-      ),
-          (Route<dynamic> route) => false,
-    );
+            (Route<dynamic> route) => false,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('오류가 발생했습니다: $e')),
+        );
+      }
+    } finally {
+      // 5. 성공/실패 여부와 관계없이 UI 상태를 정리합니다.
+      if (mounted) {
+        hideLoadingDialog(context);
+        setState(() {
+          isVerifying = false;
+        });
+      }
+    }
   }
+
+  // [REMOVED] 기존의 showSms, verifySms 함수는 새로운 로직으로 대체되어 제거되었습니다.
 
   void showLoadingDialog(BuildContext context) {
     showDialog(
@@ -169,7 +183,9 @@ class _SmsCertificationScreenState extends State<SmsCertificationScreen> {
   }
 
   void hideLoadingDialog(BuildContext context) {
-    Navigator.of(context, rootNavigator: true).pop();
+    if (Navigator.of(context, rootNavigator: true).canPop()) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
   }
 
   Widget _buildStepText(String text) {
@@ -193,7 +209,6 @@ class _SmsCertificationScreenState extends State<SmsCertificationScreen> {
       ),
       child: Column(
         children: [
-          // 받는 사람 영역
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -225,12 +240,10 @@ class _SmsCertificationScreenState extends State<SmsCertificationScreen> {
               ],
             ),
           ),
-          // 구분선
           Container(
             height: 1,
             color: Colors.grey[300],
           ),
-          // 메시지 입력 영역
           Expanded(
             child: Container(
               padding: const EdgeInsets.all(16),
@@ -244,9 +257,9 @@ class _SmsCertificationScreenState extends State<SmsCertificationScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  // 메시지 입력창
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       color: Colors.grey[100],
                       borderRadius: BorderRadius.circular(8),
@@ -265,9 +278,9 @@ class _SmsCertificationScreenState extends State<SmsCertificationScreen> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Icon(
+                        const Icon(
                           Icons.arrow_upward_rounded,
-                          color: const Color(0xFF003366),
+                          color: Color(0xFF003366),
                           size: 24,
                         ),
                       ],
