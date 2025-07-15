@@ -1,11 +1,13 @@
-// lib/screens/destination_select_screen.dart
-
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:app2_client/screens/destination_map_screen.dart';
 import 'package:app2_client/screens/start_map_screen.dart';
 import 'my_page_popup.dart';
+
+// [추가됨] 웹소켓 서비스 및 SharedPreferences import
+import 'package:app2_client/services/socket_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 
 class DestinationSelectScreen extends StatefulWidget {
   const DestinationSelectScreen({Key? key}) : super(key: key);
@@ -20,10 +22,44 @@ class _DestinationSelectScreenState extends State<DestinationSelectScreen> {
   String? _departureAddress;
   final TextEditingController _destController = TextEditingController();
 
+  @override
+  void initState() {
+    super.initState();
+    // 화면이 준비되면 진단용 웹소켓 연결 테스트를 시작합니다.
+    _initializeAndConnectSocketWithDelay();
+  }
+
+  // [수정됨] SharedPreferences에서 토큰을 가져와 연결을 시도하는 진단용 함수
+  Future<void> _initializeAndConnectSocketWithDelay() async {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // --- 진단 시작 ---
+      print("⏰ [진단] 웹소켓 연결 전 2초간 강제 대기 시작...");
+      await Future.delayed(const Duration(seconds: 2));
+      print("⏰ [진단] 대기 완료. 이제 웹소켓 연결을 시작합니다.");
+      // --- 진단 끝 ---
+
+      try {
+        // [수정됨] SharedPreferences에서 직접 accessToken을 가져옵니다.
+        final prefs = await SharedPreferences.getInstance();
+        final accessToken = prefs.getString('accessToken');
+
+        if (accessToken != null && accessToken.isNotEmpty) {
+          await SocketService.connect(accessToken, onConnect: () {
+            print("✅ [진단] 강제 지연 후 웹소켓 연결 성공!");
+          });
+        } else {
+          print("🚨 [진단] SharedPreferences에서 accessToken을 찾을 수 없습니다.");
+        }
+      } catch (e) {
+        print("🚨 [진단] 강제 지연 후 웹소켓 연결 중 오류 발생: $e");
+      }
+    });
+  }
+
   Future<void> _selectStartFromMap() async {
     final result = await Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const StartMapScreen()),
+      context,
+      MaterialPageRoute(builder: (_) => const StartMapScreen()),
     );
 
     if (result != null && result is Map) {
@@ -50,6 +86,8 @@ class _DestinationSelectScreenState extends State<DestinationSelectScreen> {
       }
       final dest = locations.first;
 
+      if (!mounted) return;
+
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -69,9 +107,11 @@ class _DestinationSelectScreenState extends State<DestinationSelectScreen> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    }
   }
 
   @override
@@ -98,7 +138,7 @@ class _DestinationSelectScreenState extends State<DestinationSelectScreen> {
             iconSize: 50.0,
             color: Colors.black38,
             onPressed: () {
-              MyPagePopup.show(context); // 호출만 하면 됨
+              MyPagePopup.show(context);
             },
           ),
         ],
