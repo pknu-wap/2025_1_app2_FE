@@ -211,36 +211,36 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
             // 설명 출력·수정
             _editingDesc
                 ? Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _descController,
-                          autofocus: true,
-                          decoration: const InputDecoration(
-                            hintText: '설명을 입력하세요',
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.check, color: Colors.green),
-                        onPressed: _saveDesc,
-                      ),
-                    ],
-                  )
-                : Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          _desc!.isEmpty ? '설명을 추가하세요' : _desc!,
-                          style: const TextStyle(fontSize: 16),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.edit, size: 20),
-                        onPressed: () => setState(() => _editingDesc = true),
-                      ),
-                    ],
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _descController,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      hintText: '설명을 입력하세요',
+                    ),
                   ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.check, color: Colors.green),
+                  onPressed: _saveDesc,
+                ),
+              ],
+            )
+                : Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _desc!.isEmpty ? '설명을 추가하세요' : _desc!,
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit, size: 20),
+                  onPressed: () => setState(() => _editingDesc = true),
+                ),
+              ],
+            ),
 
             const SizedBox(height: 12),
 
@@ -277,13 +277,13 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                   ),
                   trailing: m.role != 'HOST'
                       ? ElevatedButton(
-                          child: Text(isBookkeeper
-                              ? '정산자 해제'
-                              : '정산자 지정'),
-                          onPressed: () {
-                            _designateBookkeeperDialog(m);
-                          },
-                        )
+                    child: Text(isBookkeeper
+                        ? '정산자 해제'
+                        : '정산자 지정'),
+                    onPressed: () {
+                      _designateBookkeeperDialog(m);
+                    },
+                  )
                       : const SizedBox.shrink(),
                 ),
               );
@@ -333,7 +333,7 @@ class _MyPartyScreenState extends State<MyPartyScreen> {
                         ),
                         IconButton(
                           icon:
-                              const Icon(Icons.close, color: Colors.red),
+                          const Icon(Icons.close, color: Colors.red),
                           onPressed: () =>
                               _rejectRequest(req.requestId),
                         ),
